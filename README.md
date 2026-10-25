@@ -1,86 +1,196 @@
 # Status Board
 
-A runnable native macOS panel for Codex, version **0.2.1 build 37**. It shows live task counts, unread completions, available account quota, and synchronization coverage in the Info dialog. While processing, a divider below the counts introduces agent names such as `root.....`, `reviewer.....`, or `reviewer done`. Each task's rows disappear when that task ends; the divider disappears with the final row. Completion, waiting and stopped-error sounds are enabled; Focus integration remains deferred. The preview does not automatically silence direct audio during macOS Focus.
+为 Codex 桌面端设计的原生 macOS 状态面板。在桌面上查看正在处理、等待操作和已完成未读的任务，以及账户可用额度；任务需要关注时，通过短提示音提醒你。
 
-## Current status and remaining work
+基于 **SwiftUI + AppKit**，支持可拖动的恐龙头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.1 · build 37**，处于个人预览阶段。
 
-The [current implementation and verification index](docs/verification/results.md) is the progress baseline for **0.2.1 build 37**. The current source suite has **156 passing Swift tests** and **119 native UI assertions** after [per-feature compatibility checks](docs/verification/capability-compatibility.md); see [compact status verification](docs/verification/compact-status.md) and [agent activity verification](docs/verification/agent-activity.md). Build 31 promotes new/recent activity and owner announcements ahead of historical discovery, reserves two request slots for active conversations, and preserves account/owner verification; see [multiple-conversation validation](docs/verification/multi-conversation.md). Build 30 supports Codex builds 21477 and 21828, reports version/protocol incompatibility explicitly, and discovers recently active conversations first. Build 29 removes count tooltips, adds pointing-hand cursors and Info menu entries, and shows other panel hints after 0.35 seconds; see [Info and hover verification](docs/verification/info-hover.md). Build 28 fixes patch-field-order handling, user-scoped cache identity and queued audio expiry; see [release verification](docs/verification/review-cleanup.md#build-28-packaging-and-live-startup). Build 25 restores the original frosted material on the expanded panel and compact avatar. The desktop-capture experiment is removed from the app target; no screen-recording permission is needed. Build 14 consumes IPC JSON incrementally and retains only status metadata, fixing disconnects caused by large conversation bodies; see [large snapshot recovery](docs/verification/large-snapshots.md). Native recovery was checked with 26 AppKit assertions in build 12; see [build 12 window recovery](docs/verification/window-recovery.md). See [build 10 audio implementation](docs/verification/audio.md) and [build 11 async-question recognition](docs/verification/async-questions.md).
+> 状态来自当前账户可验证的本地会话。面板显示已同步范围内的数据，不代表整个账户的全部任务；可在 **Info** 中查看同步覆盖率和各项功能的可用性。
 
-Build 33 fixes the four [build-32 audit findings](docs/verification/code-audit-build-32.md): bounded IPC draining with a fixed partial-frame grace, transactional quota validation, same-account saved-usage fallback until the first successful quota response, and explicit stream-alert cleanup when unloaded or untracked. Production and tests share the same source refresh entry points. Model, settings and diagnostic output are split out of the app entry point. Retired full-frame IPC and lens experiments are in [Archive](Archive/README.md), outside current build and test inputs. See [build 33 verification](docs/verification/review-fixes-build-33.md).
+## 功能
 
-Build 37 unifies avatar/strip dragging through normal AppKit mouse events, removes both avatar hover hints, and uses native full-cell hand cursors for the three count buttons. See [avatar drag and cursor verification](docs/verification/avatar-drag-cursor.md).
+- **任务状态**：查看 Processing、Waiting for operation 和 Done，支持已验证的本地临时侧聊。
+- **未读完成恢复**：启动或重连后恢复可验证的已完成未读任务，在 Codex 中阅读后自动更新。
+- **Agent 活动**：任务处理期间显示主 Agent 和子 Agent 的活动行；子 Agent 不重复计入顶层任务数量。
+- **账户额度**：展示 Codex 提供的额度周期；连接异常时可保留同一账户的已验证缓存，并标记为 Saved。
+- **桌面交互**：头像与面板切换、拖动、置顶、详情折叠，自动保存位置和显示偏好。
+- **声音提醒**：完成、等待操作、停止错误使用不同短音效，支持一键静音。
+- **菜单栏与设置**：快速找回面板、刷新连接、打开 Codex、查看 Info，以及按需开启登录启动。
 
-Build 36 adds local temporary side chats to live counts and alerts after owner and parent-account verification. It discovers existing side chats from window subscription replay and new ones from live hints; side chats do not depend on persisted database rows. Hidden running side chats remain observed, and closed/idle unviewed side chats release subscriptions. See [side chat verification](docs/verification/side-chats.md).
+## 环境要求
 
-Build 35 fixes idle history reads: the app embeds a pinned, namespaced standard SQLite runtime, preserving read-only access while accepting WAL databases whose sidecars were cleaned up by the writer. It does not require a new Codex message to make an idle database readable. Numeric diagnostics now identify the failed operation and whether sidecars were present. See [idle database verification](docs/verification/sqlite-idle-recovery.md).
+| 项目 | 要求或已记录的验证环境 |
+| --- | --- |
+| 系统 | macOS 15.0 及以上；现有运行验证来自 Intel macOS 15.8.1 |
+| Codex | 已安装并登录 Codex macOS 桌面端；实时任务监控需要桌面端运行 |
+| 开发工具 | 完整 Xcode，包含 Swift 6.2 或更新的兼容工具链 |
+| 已验证工具链 | Xcode 26.3、Apple Swift 6.2.4、macOS 26.2 SDK |
+| 辅助工具 | 原生窗口验证与音效再生成需要 Python 3 |
 
-Build 34 removes the Codex build allowlist. New builds are accepted when the consumed contracts remain compatible. Realtime IPC reconnects independently from quota reads; missing sockets or read-store watchers do not prevent fresh usage. Protocol versions, required metadata, known states, owner/account scope and patch continuity remain validated. Info lists live tasks, usage, history recovery and agent-list availability; partial failures show `Connected · Limited`, and retained usage is marked `Saved`. See [capability compatibility](docs/verification/capability-compatibility.md).
+Swift Package 使用本地模块，没有远程包依赖。项目内置固定版本的 SQLite 源码，详情见 [SQLite 说明](Packages/StatusBoardCore/Sources/StatusBoardSQLite/vendor/README.md)。Release 构建已有通用二进制验证记录；完整的 Apple Silicon 运行验收仍不能由 Intel 测试替代。
 
-Build 32 introduced isolation for recoverable source failures: quota, inventory, read-store, completion history and agent metadata reads no longer tear down healthy IPC subscriptions. Failed quota reads retain the last verified quota and retry after five seconds. Failed disk recovery removes only the recovered baseline; live streams continue. Inventory scope has a 30-second grace, then counts become unavailable until it recovers. Identity read timeouts keep the socket but hide account data until reverified; account changes, closed helpers, 30 seconds of failed identity verification still rebuild the authenticated session; build 34 reconnects actual IPC transport failures independently. Unsupported stream versions invalidate only the verified sender's affected conversation. Quota availability no longer gates an authenticated IPC connection. See [fault isolation verification](docs/verification/fault-isolation.md).
-
-Diagnostics are enabled automatically at `~/Library/Logs/Status Board/diagnostics.jsonl`, with one rotated `.1` file, each capped at 1 MiB. Records contain timestamp, build, fixed stage/event names, safe error codes, attempts and recovery duration. They never include credentials, account/thread IDs, conversation text or raw errors. Repeated source errors are rate limited to one per minute; successful recovery is recorded.
-
-Not yet implemented or complete: reliable Focus integration, complete live local/remote/cloud task coverage, automatic compatibility with arbitrary future protocol or semantic changes, and formal distribution signing/notarization. Desktop active/waiting coverage remains to be verified across all relevant conversations; a historical conversation without a live owner is not by itself evidence of a missed active task.
-
-Implemented but awaiting broader acceptance: actual login cycles, real wait/error/retry and account-switch scenarios, full multi-display/accessibility checks, performance/stability measurements and final installation/lifecycle qualification. Reconnection readiness, unloaded unread recovery and reading the last unread without losing numeric counts are implemented in builds 5–7. Build 8 fixes incomplete-history precedence, full-inventory recovery, retry backoff, expired-data grace and heartbeat counting consistency. Build 9 corrects slow owner discovery and preserves read-state refreshes that occur during an in-flight snapshot.
-
-Build 16 adds a clickable avatar overhang to build 15’s toolbar and confirmed exit; [UI verification](docs/verification/avatar-toolbar.md) records 37 native interaction assertions and rendered light/dark/compact cases.
-
-Older scaffold-only status tables are [archived](docs/verification/results-pre-preview.md); they do not describe the current application.
-
-
-## Run
-
-Double-click **`dist/Status Board.app`**, or run:
+## 快速开始
 
 ```sh
-scripts/run-app.sh
+git clone https://github.com/IntegrityXu/Agent_dashboard.git
+cd Agent_dashboard
+
+# 编译 Release、打包并进行本地 ad-hoc 签名
+./scripts/package-app.sh
+
+# 启动应用
+./scripts/run-app.sh
 ```
 
-The first launch shows a compact, unpinned dinosaur avatar. Later launches restore the last form, pin state and position. Drag the blank header area to move it. The pin changes window level; clicking an unpinned panel temporarily brings it forward until another app gets focus. The expanded window has a taller top bar with a 72 pt dinosaur avatar overlapping its upper-left edge: click its dinosaur avatar to collapse, or use Settings, Pin and the rightmost power button. The power button opens a Cancel/Quit confirmation. The chevron hides or shows quota and task counts while preserving the Codex row and Connected/Pinned footer. This detail preference is saved; opening Settings expands the card to fit its menu. The Codex identity row stays below the toolbar. Collapse to the draggable dinosaur avatar; click it to expand. The menu-bar icon provides **Show Status Board**, which expands and temporarily floats the panel above ordinary windows without changing its pin preference. Menu dismissal and data refresh preserve this temporary reveal; clicking another app or switching apps returns an unpinned panel to desktop level. **Pin Status Board / Unpin Status Board** changes with the current state and lets you pin or unpin directly from the menu bar. Both menu actions reveal the expanded panel; after Unpin it stays reachable until the next outside interaction. Clicking the counts opens Codex without selecting or modifying a conversation. Position, pin and expanded state persist.
+构建完成后，也可以双击 `dist/Status Board.app`。应用以菜单栏程序运行，不显示普通 Dock 图标。
 
-## Settings
+首次启动显示未置顶的恐龙头像；点击头像展开面板，拖动头像或面板顶部空白区域移动位置。之后启动会恢复上次的位置、置顶和展开状态。
 
-The gear opens a compact overlay matching the dashboard material, rounded corners and typography. Its four rows are **Mute Sounds**, **Launch at Login**, **Info**, **Quit**. Info also appears in the menu-bar menu and opens a dialog with connection, synchronization coverage, account scope and update details. Selection closes the menu; outside clicks and Escape dismiss it without collapsing the card. Arrow keys/Tab select a row and Return/Space activate it.
+`run-app.sh` 仅在应用包不存在时自动打包。**修改源码或拉取更新后，请先重新运行 `package-app.sh`**，再启动新构建；若旧版本正在运行，应先从其菜单退出。
 
-Mute Sounds immediately stops active and queued sounds and saves its preference; events observed while muted are consumed without later replay. Audio otherwise follows system output volume. Focus integration is not enabled, so use Mute Sounds when silence is needed during Focus. Launch at Login uses macOS ServiceManagement and reflects the system's actual enabled status. If approval is required, selecting it opens the system Login Items settings. No login item is registered automatically. Quit opens a confirmation; Cancel keeps the app running, and confirmed Quit stops Status Board and its helper only. Refresh and Open Codex remain available in the separate menu-bar recovery menu.
+当前打包使用本地 ad-hoc 签名，尚未提供正式签名、公证和完整安装流程。
 
-## Sounds
+## 使用说明
 
-Completion uses a rising two-note chime; waiting uses two repeated notes; stopped error uses a lower descending pair. Each lasts about half a second. Events play serially and are deduplicated independently of task counts. Unanswered async questions are also counted as waiting, even while Codex runtime remains active; accepting the answer clears that waiting state. A new already-read completion can still sound. Source gaps, owner replacement, disconnect, account changes, sleep and quit cancel affected pending audio; recovery never plays historical events. Heartbeat automation alerts remain suppressed pending a verified notification-decision contract.
+| 操作 | 行为 |
+| --- | --- |
+| 点击恐龙头像 | 在紧凑头像和展开面板之间切换 |
+| 拖动头像或顶部空白区域 | 移动面板 |
+| 点击 Pin | 切换置顶状态 |
+| 点击详情箭头 | 隐藏或显示额度和任务统计 |
+| 点击任一任务数量 | 打开 Codex，不选择或修改具体会话 |
+| 菜单栏 → Show Status Board | 展开并临时前置面板，不改变置顶偏好 |
+| 菜单栏 → Pin / Unpin Status Board | 切换置顶并显示面板 |
+| Settings → Info | 查看连接状态、同步范围、账户范围和各数据源状态 |
+| Settings → Mute Sounds | 立即停止正在播放与排队的提示音，并保存静音偏好 |
+| Settings → Launch at Login | 通过 macOS 管理登录启动；需要批准时打开系统设置 |
+| 点击电源按钮或 Quit | 确认后退出 Status Board 及其自身的辅助进程 |
 
-An optional listening check plays the three assets without starting monitoring or changing preferences:
+未置顶面板可以在交互时临时前置，切换到其他应用后回到桌面层。登录启动默认不会自动注册，需要用户主动开启。
+
+### 数字与状态的含义
+
+| 显示 | 含义 |
+| --- | --- |
+| Processing | 已确认处于活动状态的任务 |
+| Waiting for operation | 已确认需要操作的阻塞请求，或需要关注的失败任务；包括未回答的异步问题 |
+| Done | 已完成但尚未阅读的任务，在 Codex 中阅读后移除 |
+| `—` | 数据暂不可用，不能解释为 0 |
+| Connected · Limited | 已连接，但部分数据源或功能不可用；详情见 Info |
+| Saved 额度 | 当前账户先前验证过的缓存，不是本次实时读取结果 |
+
+统计范围是**当前账户的本地、未归档顶层会话，以及经过归属验证的本地临时侧聊**。其他账户、无法确认账户归属的旧会话和子 Agent 不计入顶层任务数。侧聊仅依赖实时状态，临时会话的完成记录不会从磁盘恢复。
+
+紧凑头像用橙色 `!` 或绿色 `✓` 表示尚待处理的 Waiting / Done 状态，优先显示最近观察到的未解决事件。Agent 活动行随所属任务结束而移除。
+
+### 声音提醒
+
+完成为上行双音，等待为重复双音，停止错误为下行双音。声音按顺序播放并去重；启动、重连、历史恢复、已读变化和额度变化不会补播历史提醒。静音期间的事件不会在取消静音后重放。Heartbeat 自动化的声音提醒目前保持关闭。
+
+**尚未接入 macOS Focus 自动静音**。需要安静时，请使用 **Mute Sounds**；正常音量跟随系统输出音量。
+
+可单独试听三种音效：
 
 ```sh
 "dist/Status Board.app/Contents/MacOS/StatusBoard" --preview-sounds
 ```
 
-This command intentionally plays sound even if the normal panel's saved mute preference is enabled. Normal launches preserve that preference. The assets are original synthesized PCM WAV files, reproducible with `python3 scripts/generate-alert-sounds.py`; no extra dependency is required.
+试听模式不启动监控，也不修改偏好，但会忽略面板保存的静音设置并播放声音。音效是项目生成的 PCM WAV，可用 `python3 scripts/generate-alert-sounds.py` 重新生成。
 
-## What the numbers mean
+## 开发与验证
 
-- `processing`: confirmed active tasks.
-- `Waiting for operation`: confirmed blocking requests or failed tasks requiring attention.
-- `Done`: completed unread tasks, from live snapshots or Codex's identity-scoped unread store plus completed-turn metadata for unloaded conversations. Reading in Codex removes them. Startup/reconnection reads completion and read state directly and restores counts silently. Build **7** retains verified completed/read coverage when the last unread is read, so Done becomes 0 even while live owner discovery is catching up. Build **8** includes eligible conversations beyond the former 512 limit and counts unread completed heartbeat tasks consistently before and after loading. A live or temporarily unavailable stream blocks older disk completions; confirmed runtime and waiting flags remain usable while turn history is loading. Build **9** preserves verified unloaded completion coverage during slow discovery and follows up read-state changes after any in-flight snapshot returns. Previously live but unavailable streams still block older disk completions. Counting does not enable sound alerts.
-
-Scope is **the current account's local, unarchived, top-level conversations plus verified local temporary side chats forked from them**. Spawned subagents, other accounts, and legacy conversations with no account identity are excluded from task counts. Side chats use live state only; ephemeral completions are never recovered from disk. The desktop currently supplies live streams for only part of the local inventory. Open **Info** from either menu to see synchronized/total coverage; **numbers are the known subset, not guaranteed whole-account totals**. Unknown/disconnected data is never fabricated as zero. The user requested plain numbers without leading icons or inequality signs. The three counts show a pointing-hand cursor on hover and open Codex when clicked, without tooltips. Other panel hints appear after approximately 0.35 seconds and close when the pointer leaves; this timing applies only to Status Board. The design’s small trailing Done dot indicates unread results; the compact avatar shows one badge: orange `!` for Waiting or green `✓` for Done, chosen by the most recent observed outstanding task event. Newer events replace older ones; resolving the newest task falls back to the most recent remaining status, and clearing both removes the badge.
-
-The adapter uses protocol and data-contract checks rather than a Codex build allowlist. Builds 21477 and 21828 provided the original contract evidence; a newer build is no longer rejected merely for its version number. Missing required fields, unsupported protocol versions, unknown runtime/turn states and broken revision continuity invalidate only the affected source or conversation. Idle/system-error runtime may omit active flags; active runtime must supply them. Fatal authentication/helper contract failures still hide all account data. Each authenticated session reads the build for diagnostics. Info reports each feature's availability and recovery path. Recent conversations enter startup owner discovery first, without dropping older inventory or resetting unfinished discovery work. The app reconnects after source failure. In build **5**, a successful desktop handshake and quota read restore Connected even before Codex loads any conversations; unavailable task counts remain — until live data arrives. Sending a message is not required to restore the connection indicator. Verified same-account quota is retained and grayed while disconnected; task counts become —. Cached data is hidden until account verification and is never shown for another account. The footer uses Connected/Disconnected and Desktop/Pinned as designed. It plays three distinct bundled sounds for newly observed live completion, waiting and stopped-error events. Startup/reconnection snapshots, restored unread results, reads and quota changes remain silent. Login startup changes only when the user selects `Launch at Login`. The quota row shows only cycles actually supplied by Codex (currently the weekly cycle).
-
-## Build and verify
-
-Current toolchain: Xcode 26.3, Apple Swift 6.2.4, macOS 26.2 SDK; deployment target macOS 15.0. Executed on Intel macOS 15.8.1. No external dependencies.
+在仓库根目录执行：
 
 ```sh
-scripts/test-core.sh
-scripts/package-app.sh
-scripts/run-app.sh
+# 检查本机工具链，并编译 Foundation 冒烟程序
+./scripts/verify-environment.sh
+
+# 核心逻辑与数据适配测试
+./scripts/test-core.sh
+
+# 仅构建 Debug 应用
+./scripts/build-app.sh Debug
+
+# 原生窗口交互断言与渲染检查（需要图形桌面会话）
+bash scripts/test-window-recovery.sh
+
+# 构建 Release、打包并校验签名
+./scripts/package-app.sh
 ```
 
-The shared Xcode `StatusBoard` scheme links the local `StatusBoardCore` and `StatusBoardDesktop` modules. `package-app.sh` builds Release and ad-hoc signs the local bundle; this is a personal preview, not a notarized distribution. Build output is in `.build/`; the ready-to-run application is in `dist/`.
+也可在 Xcode 中打开 `StatusBoard.xcodeproj`，选择共享的 **StatusBoard** scheme。构建缓存输出到 `.build/`，本地应用包输出到 `dist/`，验证产物输出到 `artifacts/`；这些目录均不提交。
 
-The app reads account/quota through its own read-only CLI helper, current-account inventory through SQLite read-only mode, and task status through desktop IPC. Build **6** also restores unloaded completed/unread conversations using Codex's schema-validated account/user/local-host read store and read-only terminal turn metadata. File events refresh recovery and invalidate loaded read snapshots. Authentication material returned by the helper is decoded in memory only to match Codex's user identity hash; it is never logged or stored. The app does not send prompts, approve operations, mark conversations as read, or retain task content. Quit terminates only its own helper.
+现有 build 37 的[验证记录](docs/verification/avatar-drag-cursor.md)记载 **156 项 Swift 测试、119 项原生断言及 Release / 签名检查通过**。这是对应版本的历史验证结果，不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
 
-See [interface audit](docs/verification/interface-audit.md) and [integration verification](docs/verification/usable-preview.md) for measured results and outstanding checks. Historical Focus/native probes remain separate and are not launched by this application.
+### 目录结构
 
-Build 17 adds a divider above the Codex identity row and blue/green processing/Done labels; waiting remains orange.
+```text
+StatusBoard/
+  App/                       SwiftUI 界面、AppKit 窗口与设置
+  Resources/                 应用必需的头像资源
+  Info.plist                 应用版本与元数据
+StatusBoard.xcodeproj/        Xcode 工程与共享 schemes
+Packages/StatusBoardCore/
+  Sources/StatusBoardCore/    状态模型与流式元数据解码
+  Sources/StatusBoardDesktop/ 桌面连接、账户校验、恢复与音频
+  Sources/StatusBoardSQLite/  内置且带符号命名空间的 SQLite
+  Tests/                     Swift 测试
+Probes/                      原生能力与窗口验证工具
+scripts/                     构建、打包、验证与资源生成脚本
+docs/                        产品设计、技术方案与验证记录
+Archive/                     不参与当前应用构建的历史实验
+```
+
+根目录 `dinosaur/` 用于本地美术素材与试验，已加入 `.gitignore`，不随当前源码分发。应用与窗口验证所需的 `dinosaur-cute.png` 单独保存在 `StatusBoard/Resources/`，因此新克隆的项目无需补齐本地素材目录即可构建。
+
+## 数据来源与隐私
+
+Status Board 以只读方式观察 Codex：
+
+- 通过自身启动的 Codex CLI 辅助进程读取账户和额度。
+- 通过只读 SQLite 连接读取当前账户的本地会话清单及已读/完成恢复信息。
+- 通过桌面 IPC 接收任务状态，增量解码时跳过会话正文，仅保留状态所需的元数据。
+
+应用不会发送提示词、批准操作、标记会话已读或保存任务正文。辅助进程返回的认证材料仅在内存中用于身份匹配，不写入日志或持久化存储。账户数据在身份确认后才展示，缓存不会跨账户复用。当前应用不需要屏幕录制权限；退出时只关闭自身及自身的辅助进程。
+
+诊断日志保存在：
+
+```text
+~/Library/Logs/Status Board/diagnostics.jsonl
+```
+
+日志包含时间、构建号、固定事件名称、安全错误码、重试次数和恢复耗时；不包含凭据、账户/会话 ID、对话正文或原始错误内容。当前文件与轮转的 `.1` 文件各上限 1 MiB。
+
+## 常见问题
+
+| 现象 | 检查方式 |
+| --- | --- |
+| 提示 Codex app not found | 确认 Codex 桌面应用已安装且能正常打开，然后重新启动 Status Board |
+| Disconnected 或统计显示 `—` | 确认 Codex 已运行并登录；从菜单栏刷新，并在 Info 中检查不可用的数据源 |
+| 数字少于预期 | 查看 Info 中的同步覆盖率；远程/云端任务及未被实时来源覆盖的本地任务不保证计入 |
+| 额度显示 Saved | 当前额度读取未成功，面板保留了同账户缓存；检查连接与 Info 中的额度状态 |
+| 面板被遮挡或找不到 | 从菜单栏选择 Show Status Board，需要时开启 Pin |
+| 更新源码后仍是旧版本 | 先退出旧应用，再运行 `./scripts/package-app.sh` 和 `./scripts/run-app.sh` |
+| Xcode 构建失败 | 检查 `xcode-select -p`、`xcodebuild -version` 和 `xcrun swift --version`，确认使用完整 Xcode 及兼容工具链 |
+| 开启 Focus 后仍有声音 | Focus 自动静音尚未实现，请手动开启 Mute Sounds |
+
+Codex 的版本号用于诊断，不采用固定构建白名单。适配层会检查协议、字段、状态、账户归属和增量连续性；未来的私有协议或语义变化仍可能需要更新适配代码。最初的契约证据来自 Codex builds 21477 和 21828，不能据此保证所有后续版本兼容。
+
+## 已知边界与后续工作
+
+- 完整的本地/远程/云端任务覆盖尚未完成。
+- Focus 集成、正式发行签名与公证尚未完成。
+- 登录启动的实际登录周期、真实错误/等待/重试、账户切换需要更广泛验收。
+- 多显示器、辅助功能、完整 Spaces/全屏场景与长期性能稳定性仍有待验证。
+
+## 相关文档
+
+- [产品设计](docs/status-board-product-design-v0.1.md)
+- [技术设计](docs/status-board-technical-design-v0.1.md)
+- [实施计划与验收要求](docs/status-board-implementation-plan-v0.1.md)
+- [当前实现与验证索引](docs/verification/results.md)
+- [兼容性与功能降级](docs/verification/capability-compatibility.md)
+- [本地侧聊支持](docs/verification/side-chats.md)
+- [音频行为与验证](docs/verification/audio.md)
+- [历史实验说明](Archive/README.md)
+
+报告问题时，请提供 Status Board 版本、macOS / Codex 版本、Info 中的可用性状态及复现步骤；附加日志前请先检查内容，勿提交账户凭据或对话正文。

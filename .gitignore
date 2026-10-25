@@ -6,3 +6,6 @@ xcuserdata/
 dist/
 __pycache__/
 *.py[cod]
+
+# Local artwork experiments; the bundled avatar lives in StatusBoard/Resources.
+/dinosaur/
