@@ -1,0 +1,18 @@
+Generated with built-in imagegen.
+
+Use case: precise-object-edit.
+Asset: transparent PNG "confused" expression sticker for this exact dinosaur character.
+Use ONLY the attached dinosaur-cute.png as the template. Create a fresh confused-expression design directly from this original character. The attached image is the sole visual reference.
+
+Keep the character immediately recognizable and very close to the template: same elongated rounded snout projecting to the left, same two cream nostril marks at the snout tip, same one visible cream oval eye with a large black pupil and cream highlight near the back of the head, same orange-gold three-point crown, same head-to-body proportions, same neck length, black torso, cream belly with reddish-brown border, orange dorsal spikes with red edges, red blush cheek, short legs, rounded cream claws and curved tail. Preserve the distinctive original head outline rather than redesigning the face. Same left-facing three-quarter view, one visible eye.
+
+Change only expression and a little body language to say "huh?" in a sweet, curious, slightly goofy way:
+- Tilt the original head and its crown very gently, only about 7 degrees.
+- Raise a single small cream curved eyebrow above the visible eye. Keep the original friendly big eye, with the pupil glancing subtly upward toward the question mark, innocent rather than sad.
+- Replace the wide cheerful smile with a smaller, subtly crooked red mouth line: a clean simple softly curved stroke with one end slightly lifted, and keep the original two tiny cream rounded teeth peeking below. The mouth should be understated and naturally placed on the front of the muzzle. No O-shaped mouth, no forked mouth or branches, no exaggerated worried frown.
+- Lift the two original tiny arms slightly outward with little palms turned upward in a small cute questioning shrug. Keep the short stubby arms and original simple cream claws. No hand touching the chin.
+Add exactly ONE medium-small golden orange hand-painted question mark "?" with dark brush outline and a separate dot in the clear space above the head, beside and above the crown, with a visible gap. The symbol must not overlap the crown or get cropped.
+
+Keep the exact original painterly graphic style: flat opaque black and warm colors, irregular confident brush edges, subtle dry-brush grain, playful handmade doodle charm, very minimal shading. Preserve all original character features unless the change above explicitly calls for it. Avoid round ball heads, baby-style reproportioning, frontal two-eye faces, glossy anime eyes, photorealism, CGI, smooth vector contours or detailed scales.
+Full body on a square canvas, entire dinosaur, crown, tail and question mark visible with comfortable margins. Truly transparent PNG alpha. No backdrop, floor, shadows, extra objects, other symbols, words, border or watermark.
+

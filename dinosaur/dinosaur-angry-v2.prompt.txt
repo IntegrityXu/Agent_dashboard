@@ -1,0 +1,8 @@
+Generated with built-in imagegen.
+
+Use case: precise-object-edit.
+Edit the supplied angry crowned dinosaur illustration. The ONLY requested change is the MOUTH.
+Replace the current red mouth with its awkward forked/Y-shaped right end with a small, simple, natural closed-mouth frown: one continuous smooth shallow upside-down-U arc, center slightly higher and both ends gently lower, two clean softly rounded endpoints. Keep the mouth modest in width, centered on the muzzle beneath the eyes, in the same warm red hand-painted color and brush thickness. It should read as a cute little sulky pout. Absolutely no branching, no extra lip marks, no vertical stroke, no hook, no Y shape, no tongue, no open mouth, no teeth, no smile.
+Preserve EVERYTHING ELSE exactly as in the input: angry narrowed cream eyes, little forehead creases, blush cheeks, shape of snout, black dinosaur body, arms folded across the cream belly, crown, dorsal spikes, tail, feet, red anger symbol and two cream steam puffs. Preserve identical proportions, pose, composition, palette, irregular hand-painted texture, original square framing, transparent background and image dimensions. Do not redesign or add details to the character. This is a tiny local correction to the mouth, all other pixels should remain as unchanged as possible.
+Output one PNG with genuine transparency. No backdrop, no text, no additional symbols.
+

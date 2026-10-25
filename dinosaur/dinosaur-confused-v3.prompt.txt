@@ -1,0 +1,17 @@
+Generated with built-in imagegen.
+
+Use case: stylized-concept.
+Create one corrected confused-expression version of the original cute crowned dinosaur. The key correction is RESTORING ITS ORIGINAL DISTINCTIVE DINOSAUR HEAD SHAPE, while keeping it cute and puzzled.
+Image 1 dinosaur-cute.png is the authoritative source for the actual character identity, skull silhouette, snout, face placement, body proportions and painting style.
+Image 2 dinosaur-confused-v2.png is only a reference for the inquisitive mood, tiny "o" mouth, hand-to-chin gesture and question mark. Its almost spherical head and front-facing humanoid face were rejected; do not reproduce them.
+
+HEAD SHAPE IS THE HIGHEST PRIORITY: closely follow image 1's rounded but distinctly elongated dinosaur head: a broad snout projecting clearly forward toward the LEFT, softly rounded nose tip with two little cream nostril marks, a long gently sloping upper muzzle, a clear lower jaw/chin, and a taller rear skull joining the neck on the right. Preserve the pronounced distance between the nose tip at far left and the eye near the back of the skull at right. It must immediately read as the same dinosaur as image 1. Keep its original approximately 1.4-to-1 head width-to-height ratio and original head-to-body proportions. No circular ball head, no tiny flattened snout, no human baby face, no oversized forehead, no two large eyes spread across the muzzle. Use essentially the original left-facing three-quarter/profile view with ONE clearly visible big eye at the rear of the head. Do not turn the face toward the viewer to fit two eyes.
+
+EXPRESSION: sweet innocent curiosity. Tilt the whole original head gently by about 8 degrees, without reshaping it. A large cream oval eye with rounded black pupil and small cream highlight, a single tiny softly raised curved eyebrow above it, red cheek blush below it. The mouth is a tiny neat red oval "o" lower on the front half of the muzzle, with black center; natural placement in the muzzle, not between eyes. No worried brow, frown or sad expression. One little paw touches lightly under the jaw in a thinking gesture; the other rests near the belly.
+
+Preserve the black body, warm cream belly and small cream claws, orange-gold three-point crown sitting on the head, orange-gold dorsal spikes with vermilion edges, reddish-brown accents, rounded feet, and full curved tapering tail to the right. Keep the compact charming body but match the recognizable proportions of the original character. Only one character, anatomically coherent.
+Above the head and crown, add exactly ONE golden orange hand-painted question mark "?" with dark outline and separate dot, clearly separated from the crown and comfortably inside the canvas.
+
+Style: exactly image 1's flat opaque handmade painted shapes, rough lively brush contours, restrained dry-brush texture, minimal shading. Cute expressive doodle, same artist and same series. No 3D, gloss, gradients, photorealism, pixel art or polished vector look.
+Square composition, full dinosaur and symbol visible, comfortable margins. Genuine transparent PNG alpha. No floor, background, shadow, props, extra symbols, words, watermark or border.
+

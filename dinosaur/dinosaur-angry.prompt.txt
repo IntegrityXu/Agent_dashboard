@@ -1,0 +1,14 @@
+Generated with built-in imagegen.
+
+Use case: stylized-concept.
+Create ONE new transparent PNG character illustration: the approved cute crowned black-and-orange dinosaur acting adorably ANGRY, using the second reference for the facial expression.
+Input image 1 (dinosaur-cute.png): authoritative character identity, palette, proportions and painting style. Preserve this exact dinosaur as part of the same illustration series.
+Input image 2 (user's green dinosaur image): reference for the angry expression and little cartoon anger/steam symbols ONLY. Do not copy its green body, phone, background or pixel-art style.
+Subject: a single full-body adorable juvenile black dinosaur, oversized rounded head, short chubby body, orange-gold three-point crown sitting on its head, orange-gold dorsal spikes with vermilion-red edges, warm cream belly and tiny rounded claws/teeth, restrained dark reddish-brown contours. Same charming black / golden orange / red / cream character as image 1.
+Expression: comically grumpy and sulking rather than fearsome. Use a slightly more front-facing three-quarter head angle so both eyes can be clearly read, with two narrowed cream eye shapes, brows pressed down and sharply angled toward the center, a tiny crease at the bridge of the snout, puffed cheeks, and a small tightly pursed pout with a red curved outline. The expression should closely capture the irritated squint and puffed lower mouth of image 2 while fitting the black dinosaur's face. No smile, no roaring, no realistic aggression. Keep its cheeks softly flushed red.
+Pose: standing on two short planted feet, shoulders slightly hunched up with frustration, both tiny arms folded firmly across its cream belly in an unmistakably sulky pose, EMPTY HANDS. Tail curves naturally outward to the right. Anatomically coherent, one head, two arms, two legs, one tail.
+Expression symbols: one small hand-drawn red four-pronged comic anger mark at the temple beside the crown, and two little cream puffs of cartoon steam floating above the head with short wiggly stems. Place symbols with clean separation from the crown. These should look painted in the same rough brush style. No letters, no zzz.
+Style: same expressive handmade doodle illustration as image 1, bold opaque mostly flat painted shapes, slightly rough lively brush edges and subtle dry-brush texture, minimal shading, round cute forms. Not pixel art, not polished vector art, not photorealistic, not CGI or 3D.
+Composition: square canvas, full dinosaur centered, head and expression prominent, generous enough margins to keep every crown tip, steam puff, foot and tail tip fully visible. Isolated character with genuine transparent alpha.
+Constraints: NO PHONE, no smartphone, no handheld object, no props, no floor, no scenery, no background rectangle, no cast shadow, no frame, no watermark or text.
+

@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+artifacts/
+*.xcuserstate
+xcuserdata/
+dist/
+__pycache__/
+*.py[cod]

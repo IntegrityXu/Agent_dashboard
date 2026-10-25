@@ -1,0 +1,15 @@
+Generated with built-in imagegen.
+
+Use case: stylized-concept.
+Revise this crowned dinosaur's confused-expression illustration to be MUCH CUTER, more round and baby-like, with a sweet innocent "huh?" expression.
+Input image 1 dinosaur-cute.png: authoritative character identity, appealing face and handmade painting style.
+Input image 2 dinosaur-confused.png: previous confused variant to improve. Its elongated neck, worried eyebrows and sad face are not cute enough; replace those features.
+Keep the exact black / golden orange / vermilion red / cream palette, three-point orange-gold crown, orange dorsal spikes with red edges, cream belly, red blush cheeks, reddish-brown contour accents, black dinosaur character, and one question mark above its head.
+Make a noticeable improvement in cuteness: a very large softly rounded head with plump cheeks and a short rounded muzzle, almost no visible neck, a much smaller short chubby pear-shaped body, little stubby arms, tiny plump feet and a short thick curved tail. About half the dinosaur's total height is its head. Childlike and cuddly, coherent anatomy and compact silhouette.
+Face: gently tilted head about 15 degrees, looking toward the viewer with innocent curiosity. Two round friendly cream eyes with LARGE rounded black pupils and one small cream painted highlight per pupil, consistent with the original simple painted eye style. One eye can be only slightly wider. A tiny softly raised curved eyebrow on one side only; do not use sad slanted or knitted eyebrows. Round red blush patches on both cheeks. Mouth is a VERY SMALL simple "o" shaped warm red painted ring, black inside, low between the cheeks, with a natural clean contour. No frown, no long downturned mouth, no pout, no tears, no anxious expression, no exaggerated astonishment. The whole face should look like a sweet little baby dinosaur going "huh?".
+Pose: one tiny paw touching the cheek just below the mouth, other paw resting softly on the round belly. Crown gently tilted with the head. Full body standing, tail curves to the right. Keep hands tiny and rounded.
+Symbol: exactly ONE modest-size clearly drawn golden orange question mark "?" with dark irregular painted outline and separate dot, floating in the open space above its head and crown with a clear gap. Keep focus on the cute face, not an oversized symbol.
+Style invariants: flat opaque hand-painted colors, charming irregular brush edges and subtle dry-brush texture, bold black forms, naive handmade doodle charm, minimal shading. Same artist and same series as image 1. No anime gloss, no 3D, no gradients, no photorealism, no polished vector art, no pixel art.
+Composition: square transparent PNG, entire compact character and crown and question mark centered together, comfortable margins, no clipping.
+Genuine transparent alpha background. No scenery, ground patch, shadows, props, extra symbols, words, watermark or border.
+
