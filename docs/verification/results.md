@@ -1,6 +1,10 @@
 # Implementation and verification results
 
-Reviewed October 24, 2026 (America/New_York), against the current source and existing verification records. Current application: **0.2.1 build 37**, using per-feature contract checks instead of a build allowlist. The original private contracts were inspected on Codex builds 21477 and 21828; future semantic compatibility is not guaranteed.
+Reviewed October 26, 2026 (America/New_York), against the current source and existing verification records. Current application: **0.2.2 build 39**, using per-feature contract checks instead of a build allowlist. The original private contracts were inspected on Codex builds 21477 and 21828; future semantic compatibility is not guaranteed.
+
+Build 39 red-fox preview: new awake/sleeping avatar, application and menu bar artwork, a 30-minute conversation-idle timer, bundled legal notices, and repeatable ZIP/checksum packaging. **163 Swift tests, 185 native assertions, universal Release build, archive/resource checks and extracted-app signature verification pass.** See [build 39 release verification](fox-preview-build-39.md).
+
+Build 38 public preview: **156 Swift tests, 185 native assertions, universal Release/ZIP/signature checks passed.** See [build 38 packaging](passive-focus-drag.md#github-preview-packaging--october-26-2026).
 
 Build 37 interaction repairs: expanded and compact avatar dragging share an event-driven gesture, subsequent strip drags require no recovery click, both avatar help bubbles are removed, and all count cells use verified native hand cursors. **156 Swift tests, 119 native assertions and universal Release/signature checks pass.** See [avatar and cursor verification](avatar-drag-cursor.md).
 

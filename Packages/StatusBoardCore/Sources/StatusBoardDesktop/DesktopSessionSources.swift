@@ -16,6 +16,7 @@ extension DesktopSession {
         // conversation behind minutes of unloaded-history owner discovery.
         discovery.enqueueOrdered(result.ids.filter { !ids.contains($0) })
         if let previous = inventoryActivity {
+            if previous != result.activity { lastCodexActivityAt = Date() }
             discovery.prioritize(result.ids.filter {
                 threads.owners[$0] == nil && previous[$0] != result.activity[$0]
             })

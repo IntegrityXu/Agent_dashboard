@@ -1,7 +1,7 @@
 // !$*UTF8*$!
 { archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
 244210E48437B6556980A702 = { isa = PBXProject; attributes = { LastUpgradeCheck = 2630; }; buildConfigurationList = AAB2723FF2C8E6D1C298C1E4; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; knownRegions = (en, Base); mainGroup = 4813494D137E1631BBA301D5; productRefGroup = 0A3E27B8CA818264D75C8D81; projectDirPath = ""; projectRoot = ""; packageReferences = (BC4A71180870F7945155FBB0); targets = (34A04005BCAF206EEC990BD9, A4220DA8D661B183CE3D4CB1); };
-4813494D137E1631BBA301D5 = { isa = PBXGroup; children = (D14000000000000000000001, D13900000000000000000001, D13300000000000000000003, D13300000000000000000002, D13300000000000000000001, D115A0000000000000000021, D115A0000000000000000011, D115A0000000000000000012, D115A0000000000000000001, 9883068677B2E1519D15FDF0, A370057D4AA14A7DA5217703, CD19714134AAAE6422DF2AC4, 41CF6794BA4200B839C53531, 9CEEC13202AFBF12EE3ABB99, 0A3E27B8CA818264D75C8D81); sourceTree = "<group>"; };
+4813494D137E1631BBA301D5 = { isa = PBXGroup; children = (D14100000000000000000001, D14000000000000000000001, D13900000000000000000001, D13300000000000000000003, D13300000000000000000002, D13300000000000000000001, D115A0000000000000000021, D115A0000000000000000011, D115A0000000000000000012, D115A0000000000000000001, 9883068677B2E1519D15FDF0, A370057D4AA14A7DA5217703, CD19714134AAAE6422DF2AC4, 41CF6794BA4200B839C53531, 9CEEC13202AFBF12EE3ABB99, 0A3E27B8CA818264D75C8D81); sourceTree = "<group>"; };
 0A3E27B8CA818264D75C8D81 = { isa = PBXGroup; children = (A172CEDCAE47474B615C54D5, 14242F3CD38EC73CEB31DD5C); name = Products; sourceTree = "<group>"; };
 41CF6794BA4200B839C53531 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBoard/App/StatusBoardApp.swift; sourceTree = "<group>"; };
 9CEEC13202AFBF12EE3ABB99 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = StatusBoard/Info.plist; sourceTree = "<group>"; };
@@ -9,7 +9,7 @@ A172CEDCAE47474B615C54D5 = { isa = PBXFileReference; explicitFileType = wrapper.
 34A04005BCAF206EEC990BD9 = { isa = PBXNativeTarget; buildConfigurationList = 04229C262AC03CB8C1234C52; buildPhases = (878A52FC5FF6A57D50B7B870, E2AA269EB967A8853A258BFA, 41D311A605520FC7B8B9A980); buildRules = (); dependencies = (); name = StatusBoard; packageProductDependencies = (F4B42394554D8DA9A52BF2ED); productName = StatusBoard; productReference = A172CEDCAE47474B615C54D5; productType = "com.apple.product-type.application"; };
 878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (D13300000000000000000013, D13300000000000000000012, D13300000000000000000011, D115A0000000000000000022, EBACC11E3EA2C43A7E660950, D115A0000000000000000013, D115A0000000000000000014); runOnlyForDeploymentPostprocessing = 0; };
 E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (D8548042BF4146FC550FDCF3); runOnlyForDeploymentPostprocessing = 0; };
-41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (D115A0000000000000000002, D13900000000000000000002, D14000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
+41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (D14100000000000000000002, D115A0000000000000000002, D13900000000000000000002, D14000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
 EBACC11E3EA2C43A7E660950 = { isa = PBXBuildFile; fileRef = 41CF6794BA4200B839C53531; };
 D8548042BF4146FC550FDCF3 = { isa = PBXBuildFile; productRef = F4B42394554D8DA9A52BF2ED; };
 BC4A71180870F7945155FBB0 = { isa = XCLocalSwiftPackageReference; relativePath = Packages/StatusBoardCore; };
@@ -32,7 +32,7 @@ BE7B2D5F7276FA3CE39AEBB5 = { isa = PBXResourcesBuildPhase; buildActionMask = 214
 9257D6334BB2655A77DD015B = { isa = XCConfigurationList; buildConfigurations = (730FD1ED18B295DF3E28B58E, BD6CA7D7AE9D673AE9017BFD); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 730FD1ED18B295DF3E28B58E = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_BUNDLE_IDENTIFIER = local.statusboard.focusprobe; PRODUCT_NAME = StatusBoardFocusProbe; INFOPLIST_FILE = Probes/FocusProbe/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_ENTITLEMENTS = Probes/FocusProbe/FocusProbe.entitlements; CODE_SIGN_STYLE = Automatic; ENABLE_APP_SANDBOX = NO; SWIFT_STRICT_CONCURRENCY = complete; }; name = Debug; };
 BD6CA7D7AE9D673AE9017BFD = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_BUNDLE_IDENTIFIER = local.statusboard.focusprobe; PRODUCT_NAME = StatusBoardFocusProbe; INFOPLIST_FILE = Probes/FocusProbe/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_ENTITLEMENTS = Probes/FocusProbe/FocusProbe.entitlements; CODE_SIGN_STYLE = Automatic; ENABLE_APP_SANDBOX = NO; SWIFT_STRICT_CONCURRENCY = complete; }; name = Release; };
-D115A0000000000000000001 = { isa = PBXFileReference; lastKnownFileType = image.png; path = "StatusBoard/Resources/joker_right.png"; sourceTree = "<group>"; };
+D115A0000000000000000001 = { isa = PBXFileReference; lastKnownFileType = image.svg; path = "StatusBoard/Resources/fox-red.svg"; sourceTree = "<group>"; };
 D115A0000000000000000002 = { isa = PBXBuildFile; fileRef = D115A0000000000000000001; };
 D115A0000000000000000011 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBoard/App/BoardView.swift; sourceTree = "<group>"; };
 D115A0000000000000000012 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBoard/App/PreviewSupport.swift; sourceTree = "<group>"; };
@@ -48,6 +48,8 @@ D13300000000000000000003 = { isa = PBXFileReference; lastKnownFileType = sourcec
 D13300000000000000000013 = { isa = PBXBuildFile; fileRef = D13300000000000000000003; };
 D13900000000000000000001 = { isa = PBXFileReference; lastKnownFileType = image.icns; path = StatusBoard/Resources/AppIcon.icns; sourceTree = "<group>"; };
 D13900000000000000000002 = { isa = PBXBuildFile; fileRef = D13900000000000000000001; };
-D14000000000000000000001 = { isa = PBXFileReference; lastKnownFileType = image.png; path = StatusBoard/Resources/crown.png; sourceTree = "<group>"; };
+D14000000000000000000001 = { isa = PBXFileReference; lastKnownFileType = image.svg; path = "StatusBoard/Resources/fox-tail-open-ring.svg"; sourceTree = "<group>"; };
 D14000000000000000000002 = { isa = PBXBuildFile; fileRef = D14000000000000000000001; };
+D14100000000000000000001 = { isa = PBXFileReference; lastKnownFileType = image.svg; path = "StatusBoard/Resources/fox-red-sleeping.svg"; sourceTree = "<group>"; };
+D14100000000000000000002 = { isa = PBXBuildFile; fileRef = D14100000000000000000001; };
 }; rootObject = 244210E48437B6556980A702; }

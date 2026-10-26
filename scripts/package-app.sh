@@ -9,6 +9,11 @@ mkdir -p "$ROOT/dist"
 STAGING="$(mktemp -d "$ROOT/dist/.package.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 ditto "$SOURCE" "$STAGING/Status Board.app"
+LEGAL="$STAGING/Status Board.app/Contents/Resources/Legal"
+mkdir -p "$LEGAL"
+for document in LICENSE DISCLAIMER.md PRIVACY.md THIRD_PARTY_NOTICES.md SECURITY.md; do
+  cp "$ROOT/$document" "$LEGAL/$document"
+done
 codesign --force --deep --sign - "$STAGING/Status Board.app"
 codesign --verify --deep --strict "$STAGING/Status Board.app"
 if [[ -d "$DEST" ]]; then rm -rf "$DEST"; fi

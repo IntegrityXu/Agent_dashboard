@@ -139,7 +139,9 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         audio.receive(snapshot)
         let previousHeight = model.cardHeight
         let previousSaved = model.presentation.saved
-        model.presentation.receive(snapshot); model.now = Date()
+        let now = Date()
+        model.avatarActivity.receive(snapshot, at: now)
+        model.presentation.receive(snapshot); model.now = now
         if previousSaved != model.presentation.saved, let saved = model.presentation.saved,
            let data = try? JSONEncoder().encode(saved) { defaults.set(data, forKey: "savedUsage") }
         if previousHeight != model.cardHeight { updatePanel() }
@@ -198,7 +200,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     }
     func installMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        let menuIcon = Bundle.main.url(forResource: "crown", withExtension: "png")
+        let menuIcon = Bundle.main.url(forResource: "fox-tail-open-ring", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
         if let menuIcon {
             let scale = 22 / max(menuIcon.size.width, menuIcon.size.height)
@@ -206,7 +208,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             menuIcon.isTemplate = false
         }
         statusItem.button?.image = menuIcon
-            ?? NSImage(systemSymbolName: "crown", accessibilityDescription: "Status Board")
+            ?? NSImage(systemSymbolName: "circle.dashed", accessibilityDescription: "Status Board")
         statusItem.button?.setAccessibilityLabel("Status Board")
         let menu = NSMenu()
         menu.delegate = self

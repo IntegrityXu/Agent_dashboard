@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SOURCE="$ROOT/StatusBoard/Resources/joker_right.png"
+SOURCE="$ROOT/StatusBoard/Resources/fox-red-head.svg"
 OUTPUT="$ROOT/StatusBoard/Resources/AppIcon.icns"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/status-board-icon.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
@@ -11,13 +11,14 @@ mkdir -p "$ICONSET"
 # Center the artwork on a white rounded tile, preserving its original proportions.
 cat > "$STAGING/render.swift" <<'SWIFT'
 import Foundation
+import AppKit
 import CoreGraphics
 import ImageIO
 
 let sourceURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let outputURL = URL(fileURLWithPath: CommandLine.arguments[2])
-guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
-      let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+guard let source = NSImage(contentsOf: sourceURL),
+      let image = source.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
     fatalError("Cannot load icon source")
 }
 for size in [16, 32, 128, 256, 512] {

@@ -2,15 +2,19 @@
 
 为 Codex 桌面端设计的原生 macOS 状态面板。在桌面上查看正在处理、等待操作和已完成未读的任务，以及账户可用额度；任务需要关注时，通过短提示音提醒你。
 
-基于 **SwiftUI + AppKit**，支持可拖动的 Joker 头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.1 · build 38**，处于个人预览阶段。
+基于 **SwiftUI + AppKit**，支持可拖动的红狐头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.2 · build 39**，处于个人预览阶段。
 
 > 状态来自当前账户可验证的本地会话。面板显示已同步范围内的数据，不代表整个账户的全部任务；可在 **Info** 中查看同步覆盖率和各项功能的可用性。
 
+![红狐头像与状态面板预览](docs/images/fox-preview.png)
+
+*界面示例使用合成数据，不代表真实账户额度或任务。*
+
 ## 开源许可与使用声明
 
-项目维护者有权授权的自有代码、脚本、文档及项目生成音效采用 **[MIT License](LICENSE)**，允许按许可证条件使用、修改、再分发和商业使用。第三方材料保留原有许可。
+项目维护者有权授权的自有代码、脚本、文档、当前红狐素材及项目生成音效采用 **[MIT License](LICENSE)**，允许按许可证条件使用、修改、再分发和商业使用。第三方材料保留原有许可。
 
-**Joker 头像、皇冠及衍生应用图标为 AI 生成或基于参考图修改，素材授权待核实，暂不纳入项目的 MIT 授权。** 不将这些素材声明为完全原创，也不保证其第三方权利已核实；当前发布包包含这些素材，详见 [第三方资源与素材声明](THIRD_PARTY_NOTICES.md)。
+**当前红狐头像、睡眠头像、狐狸头部及尾巴图标由维护者使用 GPT 生成；据维护者确认，未参考已有图片。维护者对这些素材及衍生应用图标有权授予的权利按 MIT 提供。** 旧版 Joker / 皇冠素材已从当前源码与新发布包移除，其历史授权记录仍保留在 [第三方资源与素材声明](THIRD_PARTY_NOTICES.md)。
 
 Status Board 是独立维护的第三方预览工具，不是 OpenAI 或 Apple 官方产品，不表示获得其认可或背书。软件按适用许可证所述的“现状”提供，任务、额度和提醒可能不完整或不准确；责任限制仅在适用法律允许的范围内生效，不排除法定不可排除的责任。
 
@@ -21,15 +25,15 @@ Status Board 是独立维护的第三方预览工具，不是 OpenAI 或 Apple �
 
 ## 下载与安装
 
-**[下载 0.2.1 build 38 预览版（macOS 通用 ZIP）](https://github.com/IntegrityXu/Agent_dashboard/releases/download/v0.2.1-preview.38/StatusBoard-0.2.1-build38-macOS-universal.zip)** · [发布说明与所有版本](https://github.com/IntegrityXu/Agent_dashboard/releases)
+**[下载 0.2.2 build 39 预览版（macOS 通用 ZIP）](https://github.com/IntegrityXu/Agent_dashboard/releases/download/v0.2.2-preview.39/StatusBoard-0.2.2-build39-macOS-universal.zip)** · [发布说明与所有版本](https://github.com/IntegrityXu/Agent_dashboard/releases)
 
-下载前请阅读上述声明，尤其是素材授权待核实和预览版限制。已发布的 build 38 ZIP 尚未随附本轮新增的许可与说明文件；这些文件现可在仓库中查看，既有 ZIP 和校验值没有因此改变。
+下载前请阅读上述声明及预览版限制。自 build 39 起，应用包的 `Contents/Resources/Legal/` 随附 MIT 许可证、免责声明、隐私说明、第三方资源声明和安全报告说明；可在 Finder 中右键应用，选择“显示包内容”查看。
 
 下载使用无需 Xcode、Swift 或 Python。需要 **macOS 15.0 及以上**，并已安装、登录且运行 Codex macOS 桌面端。应用包包含 **Intel（x86_64）与 Apple Silicon（arm64）** 两种架构；现有实际运行验证来自 Intel Mac，完整 Apple Silicon 运行验收仍待完成。
 
-1. 下载 `StatusBoard-0.2.1-build38-macOS-universal.zip` 并解压。Releases 中自动生成的 `Source code (zip)` / `Source code (tar.gz)` 是源码，不是可直接运行的应用。
+1. 下载 `StatusBoard-0.2.2-build39-macOS-universal.zip` 并解压。Releases 中自动生成的 `Source code (zip)` / `Source code (tar.gz)` 是源码，不是可直接运行的应用。
 2. 将 `Status Board.app` 拖入“应用程序”（Applications）文件夹，再双击打开。
-3. 首次启动会显示 Joker 头像；点击头像展开面板。应用以菜单栏程序运行，不显示普通 Dock 图标；找不到面板时，从菜单栏选择 **Show Status Board**。
+3. 首次启动会显示红狐头像；点击头像展开面板。应用以菜单栏程序运行，不显示普通 Dock 图标；找不到面板时，从菜单栏选择 **Show Status Board**。
 
 ### 首次打开与预览版限制
 
@@ -87,11 +91,13 @@ cd Agent_dashboard
 ./scripts/run-app.sh
 ```
 
-构建完成后，也可以双击 `dist/Status Board.app`。应用包使用 Joker 图标；应用以菜单栏程序运行，不显示普通 Dock 图标。
+构建完成后，也可以双击 `dist/Status Board.app`。应用包使用红狐头部图标；应用以菜单栏程序运行，菜单栏使用 `fox-tail-open-ring.svg` 狐狸尾巴图标，不显示普通 Dock 图标。
 
-应用图标资源为 `StatusBoard/Resources/AppIcon.icns`，包含标准与 Retina 尺寸。替换 `StatusBoard/Resources/joker_right.png` 素材后，运行 `bash scripts/generate-app-icon.sh` 重新生成图标，再打包应用。
+应用图标资源为 `StatusBoard/Resources/AppIcon.icns`，包含标准与 Retina 尺寸，源图为 `StatusBoard/Resources/fox-red-head.svg`。替换应用图标源图后，运行 `bash scripts/generate-app-icon.sh` 重新生成图标，再打包应用。
 
-首次启动显示未置顶的 Joker 头像；点击头像展开面板，拖动头像或面板顶部空白区域移动位置。之后启动会恢复上次的位置、置顶和展开状态。
+Dashboard 悬浮头像使用非睡眠版 `StatusBoard/Resources/fox-red.svg`，在连续 30 分钟未观察到 Codex 会话活动后自动切换为 `fox-red-sleeping.svg`，新活动会恢复清醒图；任务执行期间保持清醒，定时刷新和额度查询不重置空闲计时。应用启动时重新计时。
+
+首次启动显示未置顶的红狐头像；点击头像展开面板，拖动头像或面板顶部空白区域移动位置。之后启动会恢复上次的位置、置顶和展开状态。
 
 `run-app.sh` 仅在应用包不存在时自动打包。**修改源码或拉取更新后，请先重新运行 `package-app.sh`**，再启动新构建；若旧版本正在运行，应先从其菜单退出。
 
@@ -101,7 +107,7 @@ cd Agent_dashboard
 
 | 操作 | 行为 |
 | --- | --- |
-| 点击 Joker 头像 | 在紧凑头像和展开面板之间切换 |
+| 点击红狐头像 | 在紧凑头像和展开面板之间切换 |
 | 拖动头像、顶部或 Codex 行的非按钮区域 | 移动面板，保持原应用的输入焦点 |
 | 点击 Pin | 切换置顶状态 |
 | 点击详情箭头 | 隐藏或显示额度和任务统计 |
@@ -168,11 +174,14 @@ bash scripts/test-window-recovery.sh
 
 # 构建 Release、打包并校验签名
 ./scripts/package-app.sh
+
+# 生成通用 ZIP、随包声明与 SHA-256 校验文件
+bash scripts/package-release.sh
 ```
 
 也可在 Xcode 中打开 `StatusBoard.xcodeproj`，选择共享的 **StatusBoard** scheme。构建缓存输出到 `.build/`，本地应用包输出到 `dist/`，验证产物输出到 `artifacts/`；这些目录均不提交。
 
-build 38 的[预览版发布验证](docs/verification/passive-focus-drag.md#github-preview-packaging--october-26-2026)完成 **156 项 Swift 测试、185 项原生断言、Release 构建、ZIP 完整性及解压后签名检查**。这不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
+build 39 已通过 **163 项 Swift 测试、185 项原生断言、通用 Release 构建、ZIP 完整性及解压后签名检查**，详见[红狐预览版发布验证](docs/verification/fox-preview-build-39.md)。这不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
 
 ### 目录结构
 
@@ -193,7 +202,7 @@ docs/                        产品设计、技术方案与验证记录
 Archive/                     不参与当前应用构建的历史实验
 ```
 
-根目录 `dinosaur/` 用于本地美术素材与试验，已加入 `.gitignore`，不随当前源码分发。应用与窗口验证所需的 `joker_right.png` 单独保存在 `StatusBoard/Resources/`，因此新克隆的项目无需补齐本地素材目录即可构建。
+根目录 `dinosaur/` 用于本地美术素材与试验，已加入 `.gitignore`，不随当前源码分发。应用与窗口验证所需的 `fox-red.svg` 单独保存在 `StatusBoard/Resources/`，因此新克隆的项目无需补齐本地素材目录即可构建。
 
 ## 数据来源与隐私
 
@@ -240,6 +249,8 @@ Codex 的版本号用于诊断，不采用固定构建白名单。适配层会�
 - 多显示器、辅助功能、完整 Spaces/全屏场景与长期性能稳定性仍有待验证。
 
 ## 相关文档
+
+- [版本更新记录](CHANGELOG.md)
 
 - [产品设计](docs/status-board-product-design-v0.1.md)
 - [技术设计](docs/status-board-technical-design-v0.1.md)

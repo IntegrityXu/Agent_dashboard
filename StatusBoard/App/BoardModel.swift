@@ -9,6 +9,7 @@ enum BoardSetting: Int, CaseIterable { case muteSounds, launchAtLogin, info, qui
 final class BoardModel: ObservableObject {
     @Published var presentation = DashboardPresentation()
     @Published var now = Date()
+    @Published var avatarActivity = AvatarActivity()
     @Published var pinned = false
     @Published var expanded = false
     @Published var detailsExpanded = true
@@ -63,9 +64,14 @@ final class BoardModel: ObservableObject {
         presentation.connectionLabel(at: now)
     }
     var icon = NSImage(systemSymbolName: "rectangle.stack", accessibilityDescription: "Codex")!
-    let avatar = Bundle.main.url(forResource: "joker_right", withExtension: "png")
+    private let awakeAvatar = Bundle.main.url(forResource: "fox-red", withExtension: "svg")
         .flatMap { NSImage(contentsOf: $0) }
         ?? NSImage(systemSymbolName: "person.crop.circle", accessibilityDescription: "Avatar")!
+    private let sleepingAvatar = Bundle.main.url(forResource: "fox-red-sleeping", withExtension: "svg")
+        .flatMap { NSImage(contentsOf: $0) }
+    var avatar: NSImage {
+        avatarActivity.isSleeping(at: now) ? (sleepingAvatar ?? awakeAvatar) : awakeAvatar
+    }
     var togglePin: () -> Void = {}
     var toggleExpanded: () -> Void = {}
     var toggleDetails: () -> Void = {}

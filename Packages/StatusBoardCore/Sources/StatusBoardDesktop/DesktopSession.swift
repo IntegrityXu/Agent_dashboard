@@ -33,6 +33,7 @@ final class DesktopSession {
     var client = "initializing-client"
     var ids = Set<String>()
     var inventoryActivity: [String: Inventory.Activity]?
+    var lastCodexActivityAt: Date?
     // Descendants are observed for the inline list only, never task counts or audio.
     var agentIDs = Set<String>()
     var sideParents: [String: String] = [:]
@@ -241,6 +242,7 @@ final class DesktopSession {
         do {
             let wasTask = taskIDs.contains(id)
             let before = threads.streams[id]?.observation
+            let previousRevision = threads.streams[id]?.revision
             let events = try threads.streams[id]?.accept(change: params["change"], owner: sender) ?? []
             try threads.streams[id]?.validateCompatibility()
             if sideCandidates[id] != nil || sideParents[id] != nil {
@@ -251,6 +253,12 @@ final class DesktopSession {
                     }
                     return
                 }
+            }
+            if (taskIDs.contains(id) || agentIDs.contains(id)),
+               params["change"]["type"].string == "patches",
+               let revision = threads.streams[id]?.revision,
+               let previousRevision, revision > previousRevision {
+                lastCodexActivityAt = Date()
             }
             if taskIDs.contains(id) {
                 compactStatus.observe(id, before: before, after: threads.streams[id]?.observation,
@@ -302,6 +310,7 @@ final class DesktopSession {
             quota: quota, quotaDate: quotaDate,
             accountFingerprint: identity.fingerprint)
         result.codexBuild = codexBuild
+        result.lastCodexActivityAt = lastCodexActivityAt
         result.features = featureStatuses(covered: result.covered)
         // Quota remains live while IPC reconnects. Never keep task counts from a dead socket.
         result.isConnected = client != "initializing-client" || (quotaDate != nil && sourceFailures.failures[.quota] == nil)

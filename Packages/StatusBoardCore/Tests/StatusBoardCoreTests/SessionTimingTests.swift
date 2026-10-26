@@ -5,6 +5,34 @@ import SQLite3
 @testable import StatusBoardDesktop
 
 private final class SessionClock { var now = 100.0 }
+
+@Test func avatarActivityUsesAcceptedPatchesNotSnapshotsOrReplay() throws {
+    let f = try SessionFixture()
+    try f.owner(); try f.snapshot(false)
+    #expect(f.snapshot.lastCodexActivityAt == nil)
+    try f.patch(8, [["op": "replace", "path": ["turns", 0, "status"], "value": "inProgress"]])
+    let firstActivity = try #require(f.snapshot.lastCodexActivityAt)
+    // A replay and a baseline refresh cannot manufacture new activity.
+    try f.patch(8, [["op": "replace", "path": ["turns", 0, "status"], "value": "inProgress"]])
+    try f.snapshot(false, revision: 8, status: "inProgress")
+    #expect(f.snapshot.lastCodexActivityAt == firstActivity)
+    // Invalid revisions also cannot wake the avatar.
+    try f.patch(10, [])
+    #expect(f.snapshot.lastCodexActivityAt == firstActivity)
+}
+
+@Test func avatarActivityIgnoresInventoryBaselineAndIdenticalPolls() throws {
+    let f = try SessionFixture()
+    let baseline = Inventory(ids: [f.id], activity: [f.id: .init(recency: 10, updated: 10)], total: 1, unassigned: 0)
+    try f.session.applyInventory(baseline)
+    try f.session.applyInventory(baseline)
+    #expect(f.snapshot.lastCodexActivityAt == nil)
+    let changed = Inventory(ids: [f.id], activity: [f.id: .init(recency: 11, updated: 11)], total: 1, unassigned: 0)
+    try f.session.applyInventory(changed)
+    let firstActivity = try #require(f.snapshot.lastCodexActivityAt)
+    try f.session.applyInventory(changed)
+    #expect(f.snapshot.lastCodexActivityAt == firstActivity)
+}
 private final class SessionTransport: DesktopTransport {
     var hasPendingBytes: Bool { false }
     var hasPartialFrame: Bool { false }

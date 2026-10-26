@@ -31,7 +31,7 @@ extension BoardDelegate {
         let directory = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("design-cases")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for dark in [false, true] {
-            for name in ["mixed", "agents", "agents-overflow", "unread", "waiting", "disconnected", "limited", "incompatible-data", "cold", "menu", "collapsed-details", "compact-waiting", "compact-done", "compact-latest-waiting", "compact-latest-done", "compact-offline"] {
+            for name in ["mixed", "agents", "agents-overflow", "unread", "waiting", "sleeping", "disconnected", "limited", "incompatible-data", "cold", "menu", "collapsed-details", "compact-waiting", "compact-done", "compact-sleeping", "compact-latest-waiting", "compact-latest-done", "compact-offline"] {
                 let sample = BoardModel()
                 sample.icon = model.icon; sample.expanded = !name.hasPrefix("compact"); sample.pinned = false
                 sample.detailsExpanded = name != "collapsed-details"
@@ -39,6 +39,10 @@ extension BoardDelegate {
                 var snapshot = LiveSnapshot()
                 snapshot.accountFingerprint = "visual-fixture-only"; snapshot.isConnected = true
                 snapshot.counts = TaskCounts(processing: 3, waiting: 1, done: 2)
+                if name == "sleeping" || name == "compact-sleeping" {
+                    snapshot.counts = TaskCounts()
+                    sample.avatarActivity = AvatarActivity(now: sample.now.addingTimeInterval(-AvatarActivity.sleepDelay))
+                }
                 if name.hasPrefix("agents") {
                     snapshot.agents = [
                         ProcessingAgent(rootID: "fixture", threadID: "root", path: "/root", state: .running),

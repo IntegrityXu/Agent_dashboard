@@ -22,6 +22,8 @@ public struct LiveSnapshot: Sendable {
     public var quota: [QuotaWindow] = []
     public var quotaUpdatedAt: Date?
     public var updatedAt = Date()
+    /// Actual conversation activity, independent of this snapshot's poll time.
+    public var lastCodexActivityAt: Date?
     public var accountFingerprint: String?
     public var message = "Connecting to Codex…"
     public init() {}
