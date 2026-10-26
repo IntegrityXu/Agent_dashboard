@@ -2,9 +2,38 @@
 
 为 Codex 桌面端设计的原生 macOS 状态面板。在桌面上查看正在处理、等待操作和已完成未读的任务，以及账户可用额度；任务需要关注时，通过短提示音提醒你。
 
-基于 **SwiftUI + AppKit**，支持可拖动的恐龙头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.1 · build 37**，处于个人预览阶段。
+基于 **SwiftUI + AppKit**，支持可拖动的 Joker 头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.1 · build 38**，处于个人预览阶段。
 
 > 状态来自当前账户可验证的本地会话。面板显示已同步范围内的数据，不代表整个账户的全部任务；可在 **Info** 中查看同步覆盖率和各项功能的可用性。
+
+## 下载与安装
+
+**[下载 0.2.1 build 38 预览版（macOS 通用 ZIP）](https://github.com/IntegrityXu/Agent_dashboard/releases/download/v0.2.1-preview.38/StatusBoard-0.2.1-build38-macOS-universal.zip)** · [发布说明与所有版本](https://github.com/IntegrityXu/Agent_dashboard/releases)
+
+下载使用无需 Xcode、Swift 或 Python。需要 **macOS 15.0 及以上**，并已安装、登录且运行 Codex macOS 桌面端。应用包包含 **Intel（x86_64）与 Apple Silicon（arm64）** 两种架构；现有实际运行验证来自 Intel Mac，完整 Apple Silicon 运行验收仍待完成。
+
+1. 下载 `StatusBoard-0.2.1-build38-macOS-universal.zip` 并解压。Releases 中自动生成的 `Source code (zip)` / `Source code (tar.gz)` 是源码，不是可直接运行的应用。
+2. 将 `Status Board.app` 拖入“应用程序”（Applications）文件夹，再双击打开。
+3. 首次启动会显示 Joker 头像；点击头像展开面板。应用以菜单栏程序运行，不显示普通 Dock 图标；找不到面板时，从菜单栏选择 **Show Status Board**。
+
+### 首次打开与预览版限制
+
+当前预览版仅使用本地 **ad-hoc 签名**，尚未使用 Apple Developer ID 正式签名，也未经 Apple 公证。macOS 可能提示无法验证开发者或无法检查恶意软件。
+
+仅在确认下载来自本仓库、且愿意运行此预览版时，先尝试打开应用，然后到 **系统设置 → 隐私与安全** 中找到对应提示，选择 **仍要打开（Open Anyway）**，按系统提示确认。详情见 [Apple 的应用安全说明](https://support.apple.com/zh-cn/102445)。受管理的 Mac 可能不允许此操作。
+
+每次发布附带 `SHA256SUMS.txt`。如需检查下载是否完整，将它与应用 ZIP 放在同一目录，在该目录的终端执行：
+
+```sh
+shasum -a 256 -c SHA256SUMS.txt
+```
+
+校验值只能检查文件一致性，不能替代正式签名与公证。预览版的功能覆盖和已知限制见下文。
+
+### 更新与卸载
+
+- **更新**：从 Status Board 菜单退出旧版本，下载并解压新版本，将“应用程序”中的旧应用替换，再重新打开。位置和显示偏好会保留；当前没有自动更新功能。
+- **卸载**：如果曾开启 **Launch at Login**，先关闭它；退出应用，再将“应用程序”中的 `Status Board.app` 移到废纸篓。
 
 ## 功能
 
@@ -16,7 +45,9 @@
 - **声音提醒**：完成、等待操作、停止错误使用不同短音效，支持一键静音。
 - **菜单栏与设置**：快速找回面板、刷新连接、打开 Codex、查看 Info，以及按需开启登录启动。
 
-## 环境要求
+## 从源码构建
+
+以下开发环境仅供自行编译或参与开发的用户使用。
 
 | 项目 | 要求或已记录的验证环境 |
 | --- | --- |
@@ -28,7 +59,7 @@
 
 Swift Package 使用本地模块，没有远程包依赖。项目内置固定版本的 SQLite 源码，详情见 [SQLite 说明](Packages/StatusBoardCore/Sources/StatusBoardSQLite/vendor/README.md)。Release 构建已有通用二进制验证记录；完整的 Apple Silicon 运行验收仍不能由 Intel 测试替代。
 
-## 快速开始
+### 构建与启动
 
 ```sh
 git clone https://github.com/IntegrityXu/Agent_dashboard.git
@@ -41,29 +72,34 @@ cd Agent_dashboard
 ./scripts/run-app.sh
 ```
 
-构建完成后，也可以双击 `dist/Status Board.app`。应用以菜单栏程序运行，不显示普通 Dock 图标。
+构建完成后，也可以双击 `dist/Status Board.app`。应用包使用 Joker 图标；应用以菜单栏程序运行，不显示普通 Dock 图标。
 
-首次启动显示未置顶的恐龙头像；点击头像展开面板，拖动头像或面板顶部空白区域移动位置。之后启动会恢复上次的位置、置顶和展开状态。
+应用图标资源为 `StatusBoard/Resources/AppIcon.icns`，包含标准与 Retina 尺寸。替换 `StatusBoard/Resources/joker_right.png` 素材后，运行 `bash scripts/generate-app-icon.sh` 重新生成图标，再打包应用。
+
+首次启动显示未置顶的 Joker 头像；点击头像展开面板，拖动头像或面板顶部空白区域移动位置。之后启动会恢复上次的位置、置顶和展开状态。
 
 `run-app.sh` 仅在应用包不存在时自动打包。**修改源码或拉取更新后，请先重新运行 `package-app.sh`**，再启动新构建；若旧版本正在运行，应先从其菜单退出。
 
-当前打包使用本地 ad-hoc 签名，尚未提供正式签名、公证和完整安装流程。
+当前打包使用本地 ad-hoc 签名；下载预览版的安装方式及首次打开说明见上方“下载与安装”。
 
 ## 使用说明
 
 | 操作 | 行为 |
 | --- | --- |
-| 点击恐龙头像 | 在紧凑头像和展开面板之间切换 |
-| 拖动头像或顶部空白区域 | 移动面板 |
+| 点击 Joker 头像 | 在紧凑头像和展开面板之间切换 |
+| 拖动头像、顶部或 Codex 行的非按钮区域 | 移动面板，保持原应用的输入焦点 |
 | 点击 Pin | 切换置顶状态 |
 | 点击详情箭头 | 隐藏或显示额度和任务统计 |
 | 点击任一任务数量 | 打开 Codex，不选择或修改具体会话 |
 | 菜单栏 → Show Status Board | 展开并临时前置面板，不改变置顶偏好 |
 | 菜单栏 → Pin / Unpin Status Board | 切换置顶并显示面板 |
+| 菜单栏 → Keyboard Settings… | 临时进入键盘设置；支持方向键、Tab、回车，Esc 返回原工作窗口 |
 | Settings → Info | 查看连接状态、同步范围、账户范围和各数据源状态 |
 | Settings → Mute Sounds | 立即停止正在播放与排队的提示音，并保存静音偏好 |
 | Settings → Launch at Login | 通过 macOS 管理登录启动；需要批准时打开系统设置 |
 | 点击电源按钮或 Quit | 确认后退出 Status Board 及其自身的辅助进程 |
+
+普通点击、拖拽、置顶、展开/收起以及鼠标操作设置不会抢走原应用的键盘焦点。Keyboard Settings、Info 和退出确认按需临时获取焦点，结束后返回原工作窗口；若期间已切换到其他应用，则不强行切回。
 
 未置顶面板可以在交互时临时前置，切换到其他应用后回到桌面层。登录启动默认不会自动注册，需要用户主动开启。
 
@@ -81,6 +117,8 @@ cd Agent_dashboard
 统计范围是**当前账户的本地、未归档顶层会话，以及经过归属验证的本地临时侧聊**。其他账户、无法确认账户归属的旧会话和子 Agent 不计入顶层任务数。侧聊仅依赖实时状态，临时会话的完成记录不会从磁盘恢复。
 
 紧凑头像用橙色 `!` 或绿色 `✓` 表示尚待处理的 Waiting / Done 状态，优先显示最近观察到的未解决事件。Agent 活动行随所属任务结束而移除。
+
+缩小后的头像保持 54×54 的圆角方形，外围进度圈显示**周额度剩余比例**，从顶部顺时针绘制：剩余超过 40% 为绿色，超过 20% 为橙色，20% 及以下为红色。缓存额度使用灰色进度；没有周额度数据时仅显示灰色底圈，展开面板查看具体状态。
 
 ### 声音提醒
 
@@ -119,7 +157,7 @@ bash scripts/test-window-recovery.sh
 
 也可在 Xcode 中打开 `StatusBoard.xcodeproj`，选择共享的 **StatusBoard** scheme。构建缓存输出到 `.build/`，本地应用包输出到 `dist/`，验证产物输出到 `artifacts/`；这些目录均不提交。
 
-现有 build 37 的[验证记录](docs/verification/avatar-drag-cursor.md)记载 **156 项 Swift 测试、119 项原生断言及 Release / 签名检查通过**。这是对应版本的历史验证结果，不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
+build 38 的[预览版发布验证](docs/verification/passive-focus-drag.md#github-preview-packaging--october-26-2026)完成 **156 项 Swift 测试、185 项原生断言、Release 构建、ZIP 完整性及解压后签名检查**。这不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
 
 ### 目录结构
 
@@ -140,7 +178,7 @@ docs/                        产品设计、技术方案与验证记录
 Archive/                     不参与当前应用构建的历史实验
 ```
 
-根目录 `dinosaur/` 用于本地美术素材与试验，已加入 `.gitignore`，不随当前源码分发。应用与窗口验证所需的 `dinosaur-cute.png` 单独保存在 `StatusBoard/Resources/`，因此新克隆的项目无需补齐本地素材目录即可构建。
+根目录 `dinosaur/` 用于本地美术素材与试验，已加入 `.gitignore`，不随当前源码分发。应用与窗口验证所需的 `joker_right.png` 单独保存在 `StatusBoard/Resources/`，因此新克隆的项目无需补齐本地素材目录即可构建。
 
 ## 数据来源与隐私
 

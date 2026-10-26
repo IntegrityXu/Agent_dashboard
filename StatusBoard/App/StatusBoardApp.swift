@@ -44,6 +44,10 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     var preferredScreen: Int?
     var localEventMonitor: Any?
     var outsideEventMonitor: Any?
+    private var focusReturnApplication: NSRunningApplication?
+    private weak var focusReturnWindow: NSWindow?
+    private var restoringFocus = false
+    private var interactionApplicationPID: pid_t?
     let desktopLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
     let defaults = UserDefaults.standard
 
@@ -75,12 +79,14 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(applicationActivated), name: NSWorkspace.didActivateApplicationNotification, object: nil)
         readLoginStatus()
         model.toggleSettings = { [weak self] in self?.toggleSettings() }
+        model.openKeyboardSettings = { [weak self] in self?.openKeyboardSettings() }
         model.selectSetting = { [weak self] index in self?.selectSetting(index) }
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
         panel = BoardPanel(contentRect: NSRect(x: visible.maxX - 344, y: visible.maxY - 350, width: 320, height: 310),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.title = "Status Board"
         panel.acceptsMouseMovedEvents = true
+        panel.becomesKeyOnlyIfNeeded = true
         panel.isFloatingPanel = true; panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary, .stationary]
@@ -166,11 +172,14 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         }
     }
     func handleSettingsEvent(_ event: NSEvent) -> NSEvent? {
+        if event.type == .keyDown {
+            guard event.window === panel, panel.allowsKeyboardFocus else { return event }
+            if event.keyCode == 53 { dismissSettings(); return nil }
+        }
         guard model.settingsOpen else { return event }
         if event.type == .keyDown {
             let count = BoardSetting.allCases.count
             switch event.keyCode {
-            case 53: model.settingsOpen = false; return nil
             case 125, 48:
                 let step = event.keyCode == 48 && event.modifierFlags.contains(.shift) ? -1 : 1
                 model.menuSelection = ((model.menuSelection ?? (step > 0 ? -1 : count)) + step + count) % count
@@ -182,25 +191,37 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             default: return event
             }
         }
-        guard event.window === panel else { model.settingsOpen = false; return event }
+        guard event.window === panel else { dismissSettings(restoreFocus: false); return event }
         let point = CGPoint(x: event.locationInWindow.x, y: panel.frame.height - event.locationInWindow.y)
-        if !model.menuFrame.contains(point) && !model.gearFrame.contains(point) { model.settingsOpen = false }
+        if !model.menuFrame.contains(point) && !model.gearFrame.contains(point) { dismissSettings() }
         return event
     }
     func installMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Status Board")
+        let menuIcon = Bundle.main.url(forResource: "crown", withExtension: "png")
+            .flatMap { NSImage(contentsOf: $0) }
+        if let menuIcon {
+            let scale = 22 / max(menuIcon.size.width, menuIcon.size.height)
+            menuIcon.size = NSSize(width: menuIcon.size.width * scale, height: menuIcon.size.height * scale)
+            menuIcon.isTemplate = false
+        }
+        statusItem.button?.image = menuIcon
+            ?? NSImage(systemSymbolName: "crown", accessibilityDescription: "Status Board")
+        statusItem.button?.setAccessibilityLabel("Status Board")
         let menu = NSMenu()
         menu.delegate = self
-        for (title, selector) in [("Show Status Board", #selector(showPanel)), ("Pin Status Board", #selector(togglePinFromMenu)), ("Refresh", #selector(refresh)), ("Open Codex", #selector(openCodex)), ("Info", #selector(showInfo)), ("Quit", #selector(quit))] {
+        for (title, selector) in [("Show Status Board", #selector(showPanel)), ("Pin Status Board", #selector(togglePinFromMenu)), ("Refresh", #selector(refresh)), ("Open Codex", #selector(openCodex)), ("Keyboard Settings…", #selector(openKeyboardSettings)), ("Info", #selector(showInfo)), ("Quit", #selector(quit))] {
             let item = NSMenuItem(title: title, action: selector, keyEquivalent: ""); item.target = self; menu.addItem(item)
             if selector == #selector(togglePinFromMenu) { pinMenuItem = item }
         }
         statusItem.menu = menu
         updatePinMenu()
     }
-    func menuWillOpen(_ menu: NSMenu) { QuickHelpController.shared.dismiss(); statusMenuTracking = true; updatePinMenu() }
-    func menuDidClose(_ menu: NSMenu) { statusMenuTracking = false }
+    func menuWillOpen(_ menu: NSMenu) { rememberFocusReturn(); QuickHelpController.shared.dismiss(); statusMenuTracking = true; updatePinMenu() }
+    func menuDidClose(_ menu: NSMenu) {
+        statusMenuTracking = false
+        if model.keyboardSettings && !model.settingsOpen { dismissSettings() }
+    }
     func updatePinMenu() {
         pinMenuItem?.title = model.pinned ? "Unpin Status Board" : "Pin Status Board"
     }
@@ -221,7 +242,6 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
                 self.defaults.set(true, forKey: "expanded")
                 self.raised = !self.model.pinned
                 self.updatePanel()
-                NSApp.activate(ignoringOtherApps: true)
                 self.beginInteraction()
                 self.panel.orderFrontRegardless()
             }
@@ -246,8 +266,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
                 self.model.expanded = true
                 self.defaults.set(true, forKey: "expanded")
                 self.updatePanel()
-                self.beginInteraction()
-                NSApp.activate(ignoringOtherApps: true)
+                self.beginKeyboardInteraction()
                 let alert = NSAlert()
                 alert.messageText = "Status Board Info"
                 alert.informativeText = self.model.infoText
@@ -257,7 +276,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
                 self.infoAlert = alert
                 alert.beginSheetModal(for: self.panel) { [weak self] _ in
                     self?.infoAlert = nil
-                    self?.beginInteraction()
+                    self?.finishKeyboardInteraction()
                 }
             }
         }
@@ -266,8 +285,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         guard quitAlert == nil, infoAlert == nil, !infoPending else { return }
         QuickHelpController.shared.dismiss()
         model.settingsOpen = false
-        beginInteraction()
-        NSApp.activate(ignoringOtherApps: true)
+        beginKeyboardInteraction()
         let alert = NSAlert()
         alert.messageText = "Quit Status Board?"
         alert.informativeText = "The status board and its notifications will stop."
@@ -283,14 +301,79 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             guard let self else { return }
             self.quitAlert = nil
             if response == .alertSecondButtonReturn { NSApp.terminate(nil) }
-            else { self.beginInteraction() }
+            else { self.finishKeyboardInteraction() }
         }
+        // Sheet setup assigns standard Cancel/Escape equivalents. Keep Return
+        // on the safe action even when this panel was previously inactive.
+        alert.window.defaultButtonCell = alert.buttons[0].cell as? NSButtonCell
+        alert.buttons[0].keyEquivalent = "\r"
+        alert.buttons[1].keyEquivalent = ""
     }
     @objc func screensChanged() { updatePanel() }
     func beginInteraction() {
+        interactionApplicationPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         if !model.pinned { raised = true }
         updatePanelLevel()
+        panel.orderFrontRegardless()
+    }
+    private func rememberFocusReturn() {
+        guard !panel.allowsKeyboardFocus else { return }
+        if let app = NSWorkspace.shared.frontmostApplication,
+           app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            focusReturnApplication = app
+            focusReturnWindow = nil
+        } else if let window = NSApp.keyWindow, window !== panel, window !== panel.attachedSheet {
+            focusReturnWindow = window
+            focusReturnApplication = nil
+        }
+    }
+    func beginKeyboardInteraction() {
+        rememberFocusReturn()
+        panel.allowsKeyboardFocus = true
+        beginInteraction()
+        interactionApplicationPID = ProcessInfo.processInfo.processIdentifier
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+    }
+    func finishKeyboardInteraction(restoreFocus: Bool = true) {
+        guard panel.allowsKeyboardFocus, !restoringFocus else { return }
+        restoringFocus = true
+        let application = focusReturnApplication
+        let window = focusReturnWindow
+        focusReturnApplication = nil; focusReturnWindow = nil
+        let frontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let mayRestore = frontmost == ProcessInfo.processInfo.processIdentifier
+            || frontmost == application?.processIdentifier
+        model.keyboardSettings = false
+        panel.allowsKeyboardFocus = false
+        if panel.isKeyWindow { panel.resignKey() }
+        if restoreFocus && mayRestore {
+            if let window, window.isVisible { window.makeKeyAndOrderFront(nil) }
+            else if let application, !application.isTerminated { application.activate(options: []) }
+        }
+        restoringFocus = false
+    }
+    func dismissSettings(restoreFocus: Bool = true) {
+        model.settingsOpen = false
+        if quitAlert == nil && infoAlert == nil && !infoPending {
+            finishKeyboardInteraction(restoreFocus: restoreFocus)
+        }
+    }
+    @objc func openKeyboardSettings() {
+        guard quitAlert == nil, infoAlert == nil, !infoPending else { return }
+        // A menu-bar selection must finish tracking before acquiring keyboard focus.
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, !self.terminating, self.quitAlert == nil, self.infoAlert == nil, !self.infoPending else { return }
+                self.model.expanded = true
+                self.defaults.set(true, forKey: "expanded")
+                if !self.model.settingsOpen { self.toggleSettings() }
+                self.updatePanel()
+                self.beginKeyboardInteraction()
+                self.model.keyboardSettings = true
+                self.model.menuSelection = 0
+            }
+        }
     }
     func windowDidResignKey(_ notification: Notification) {
         panel.clearHandCursor()
@@ -298,17 +381,27 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         // Menus can take key focus too. Only an outside click or app switch
         // ends a temporary reveal, not this notification.
         model.settingsOpen = false
+        if quitAlert == nil && infoAlert == nil && !infoPending && !statusMenuTracking {
+            finishKeyboardInteraction(restoreFocus: false)
+        }
     }
     @objc func applicationActivated(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
+        let previous = interactionApplicationPID
+        interactionApplicationPID = app.processIdentifier
+        // A passive reveal keeps the existing app active. Its delayed activation
+        // notification is not a new app switch and must not bury the panel.
+        guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              app.processIdentifier != previous else { return }
         endInteraction()
     }
     func endInteraction() {
         QuickHelpController.shared.dismiss()
         guard !statusMenuTracking, !revealPending, quitAlert == nil, infoAlert == nil, !infoPending else { return }
-        model.settingsOpen = false
+        dismissSettings(restoreFocus: false)
+        panel.cancelDrag()
+        interactionApplicationPID = nil
         raised = false
         updatePanelLevel()
     }
@@ -324,7 +417,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     }
     func toggleExpanded() {
         QuickHelpController.shared.dismiss()
-        model.settingsOpen = false
+        dismissSettings()
         model.expanded.toggle(); defaults.set(model.expanded, forKey: "expanded"); updatePanel()
     }
     func toggleDetails(animated: Bool = true) {
@@ -332,7 +425,7 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         let start = model.detailsProgress
         detailsAnimationTimer?.invalidate()
         detailsAnimationTimer = nil
-        model.settingsOpen = false
+        dismissSettings()
         model.detailsExpanded.toggle()
         defaults.set(model.detailsExpanded, forKey: "detailsExpanded")
         guard animated && model.expanded && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
@@ -369,7 +462,8 @@ final class BoardDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
             defaults.set(true, forKey: "detailsExpanded")
             updatePanel()
         }
-        model.settingsOpen.toggle()
+        if model.settingsOpen { dismissSettings() }
+        else { model.settingsOpen = true }
     }
     func windowDidMove(_ notification: Notification) {
         guard detailsAnimationTimer == nil else { return }

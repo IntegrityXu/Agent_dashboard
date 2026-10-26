@@ -10,6 +10,9 @@ extension BoardDelegate {
     }
     func selectSetting(_ index: Int) {
         model.settingsOpen = false
+        defer {
+            if infoAlert == nil && quitAlert == nil && !infoPending { finishKeyboardInteraction() }
+        }
         guard let setting = BoardSetting(rawValue: index) else { return }
         switch setting {
         case .muteSounds:
@@ -31,7 +34,12 @@ extension BoardDelegate {
                 let alert = NSAlert()
                 alert.messageText = "Could not update Launch at Login"
                 alert.informativeText = error.localizedDescription
-                alert.runModal()
+                infoAlert = alert
+                beginKeyboardInteraction()
+                alert.beginSheetModal(for: panel) { [weak self] _ in
+                    self?.infoAlert = nil
+                    self?.finishKeyboardInteraction()
+                }
             }
         case .info: showInfo()
         case .quit: quit()

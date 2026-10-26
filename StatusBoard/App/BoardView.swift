@@ -7,10 +7,21 @@ import StatusBoardDesktop
 /// Never drain AppKit's event queue: mouse-up must finish normal window dispatch.
 struct DragArea: NSViewRepresentable {
     var click: (() -> Void)?
-    func makeNSView(context: Context) -> DragView { let view = DragView(); view.click = click; return view }
-    func updateNSView(_ view: DragView, context: Context) { view.click = click }
+    var excludes: ((NSPoint) -> Bool)?
+    func makeNSView(context: Context) -> DragView { let view = DragView(); view.click = click; view.excludes = excludes; return view }
+    func updateNSView(_ view: DragView, context: Context) { view.click = click; view.excludes = excludes }
     class DragView: NSView {
         var click: (() -> Void)?
+        var excludes: ((NSPoint) -> Bool)?
+        func containsDragPoint(_ point: NSPoint) -> Bool {
+            window != nil && !isHiddenOrHasHiddenAncestor
+                && bounds.intersection(visibleRect).contains(convert(point, from: nil)) && excludes?(point) != true
+        }
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard let hit = super.hitTest(point),
+                  excludes?(superview?.convert(point, to: nil) ?? point) != true else { return nil }
+            return hit
+        }
         private var start: (pointer: NSPoint, origin: NSPoint)?
         private var didDrag = false
         override var mouseDownCanMoveWindow: Bool { false }
@@ -35,7 +46,17 @@ struct DragArea: NSViewRepresentable {
             if shouldClick { click?() }
         }
         override func cancelOperation(_ sender: Any?) { cancelPress() }
-        override func viewWillMove(toWindow newWindow: NSWindow?) { cancelPress(); super.viewWillMove(toWindow: newWindow) }
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            if newWindow !== window {
+                cancelPress()
+                (window as? BoardPanel)?.dragViews.remove(self)
+            }
+            super.viewWillMove(toWindow: newWindow)
+        }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            (window as? BoardPanel)?.dragViews.add(self)
+        }
         private func cancelPress() { start = nil; didDrag = false }
     }
 }
@@ -70,6 +91,8 @@ struct PointingHandArea: NSViewRepresentable {
 /// own tracking. Active-always tracking also works on the nonactivating panel.
 final class BoardHostingView: NSHostingView<BoardView> {
     private var pointerTracking: NSTrackingArea?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var needsPanelToBecomeKey: Bool { false }
     override func updateTrackingAreas() {
         if let pointerTracking { removeTrackingArea(pointerTracking) }
         let area = NSTrackingArea(rect: .zero,
@@ -111,6 +134,30 @@ private enum BoardPalette {
     static func blue(_ dark: Bool) -> Color { dark ? Color(red: 0.62, green: 0.75, blue: 0.95) : Color(red: 0.18, green: 0.35, blue: 0.63) }
 }
 
+/// Follow the compact tile's existing rounded square, starting at twelve o'clock.
+private struct CompactUsageOutline: Shape {
+    func path(in rect: CGRect) -> Path {
+        let bounds = rect.insetBy(dx: 1.5, dy: 1.5)
+        let radius = min(18.5, min(bounds.width, bounds.height) / 2)
+        var path = Path()
+        path.move(to: CGPoint(x: bounds.midX, y: bounds.minY))
+        path.addLine(to: CGPoint(x: bounds.maxX - radius, y: bounds.minY))
+        path.addArc(center: CGPoint(x: bounds.maxX - radius, y: bounds.minY + radius), radius: radius,
+                    startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        path.addLine(to: CGPoint(x: bounds.maxX, y: bounds.maxY - radius))
+        path.addArc(center: CGPoint(x: bounds.maxX - radius, y: bounds.maxY - radius), radius: radius,
+                    startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        path.addLine(to: CGPoint(x: bounds.minX + radius, y: bounds.maxY))
+        path.addArc(center: CGPoint(x: bounds.minX + radius, y: bounds.maxY - radius), radius: radius,
+                    startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        path.addLine(to: CGPoint(x: bounds.minX, y: bounds.minY + radius))
+        path.addArc(center: CGPoint(x: bounds.minX + radius, y: bounds.minY + radius), radius: radius,
+                    startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        path.closeSubpath()
+        return path
+    }
+}
+
 struct BoardView: View {
     @ObservedObject var model: BoardModel
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -144,7 +191,7 @@ struct BoardView: View {
                 Image(nsImage: model.avatar).resizable().scaledToFit().frame(width: 44, height: 44).opacity(model.connected ? 1 : 0.65)
                     .frame(width: 54, height: 54)
                     .background { frostedBackground }
-                    .overlay { border }
+                    .overlay { compactUsageRing }
                     .overlay(alignment: .topTrailing) {
                         if let status = model.compactStatus {
                             Text(status == .waiting ? "!" : "✓").font(.system(size: 12, weight: .semibold))
@@ -157,6 +204,7 @@ struct BoardView: View {
                     .overlay { DragArea(click: model.toggleExpanded) }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(model.compactAccessibilityLabel)
+                    .accessibilityValue(model.compactUsageAccessibilityValue)
                     .accessibilityAddTraits(.isButton).accessibilityAction { model.toggleExpanded() }
                     .focusable()
                     .onKeyPress(.space) { model.toggleExpanded(); return .handled }
@@ -171,7 +219,7 @@ struct BoardView: View {
         }
         .saturation(model.connected ? 1 : 0)
         .coordinateSpace(name: "board")
-        .onChange(of: model.settingsOpen) { _, open in if !open { settingsFocused = true } }
+        .onChange(of: model.keyboardSettings) { _, active in settingsFocused = active }
     }
     private var frostedBackground: some View {
         // Fade only the material, keeping foreground text and controls opaque.
@@ -185,39 +233,21 @@ struct BoardView: View {
             .strokeBorder(.white.opacity(dark ? 0.16 : 0.55), lineWidth: 1)
             .allowsHitTesting(false)
     }
+    private var compactUsageRing: some View {
+        ZStack {
+            CompactUsageOutline().stroke(.primary.opacity(dark ? 0.18 : 0.12), lineWidth: 3)
+            if let quota = model.weeklyQuota, quota.remaining > 0 {
+                CompactUsageOutline()
+                    .trim(from: 0, to: CGFloat(quota.remaining) / 100)
+                    .stroke(quotaColor(quota), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
     private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Color.clear.frame(width: 34, height: 34).allowsHitTesting(false).accessibilityHidden(true)
-                DragArea().frame(maxWidth: .infinity).frame(height: 34).quickHelp("Drag to move")
-                Button(action: model.toggleSettings) { controlIcon("gearshape", active: model.settingsOpen) }
-                    .buttonStyle(BoardControlStyle())
-                    .focusable().focused($settingsFocused).focusEffectDisabled()
-                    .quickHelp("Settings").accessibilityLabel("Settings")
-                    .accessibilityValue(model.settingsOpen ? "Expanded" : "Collapsed")
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("board")) } action: { model.gearFrame = $0 }
-                Button(action: model.togglePin) {
-                    controlIcon("pin", active: model.pinned).foregroundStyle(model.pinned && model.connected ? BoardPalette.blue(dark) : .primary)
-                }.buttonStyle(BoardControlStyle())
-                    .quickHelp(model.pinned ? "Unpin to desktop" : "Pin above other apps")
-                    .accessibilityLabel(model.pinned ? "Unpin to desktop" : "Pin above other apps")
-                Button(action: model.requestQuit) { controlIcon("power") }
-                    .buttonStyle(BoardControlStyle()).quickHelp("Quit Status Board…")
-                    .accessibilityLabel("Quit Status Board")
-            }.frame(height: 34).padding(.bottom, 7)
-            Divider().frame(height: 1).padding(.bottom, 6)
-            HStack(spacing: 10) {
-                Image(nsImage: model.icon).resizable().frame(width: 28, height: 28)
-                    .opacity(model.connected ? 1 : 0.65).accessibilityHidden(true)
-                Text("Codex").font(.system(size: 14, weight: .medium))
-                DragArea().frame(maxWidth: .infinity).frame(height: 30).quickHelp("Drag to move")
-                Button(action: model.toggleDetails) {
-                    controlIcon("chevron.down").rotationEffect(.degrees(180 * model.detailsProgress))
-                }.buttonStyle(BoardControlStyle())
-                    .quickHelp(model.detailsExpanded ? "Hide details" : "Show details")
-                    .accessibilityLabel(model.detailsExpanded ? "Hide details" : "Show details")
-                    .accessibilityValue(model.detailsExpanded ? "Expanded" : "Collapsed")
-            }.frame(height: 30)
+            header
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 14) {
                     if model.windows.isEmpty {
@@ -232,7 +262,7 @@ struct BoardView: View {
                 }.padding(.bottom, 18)
                 Divider()
                 HStack(spacing: 4) {
-                    count(model.counts?.processing, label: "processing", tint: BoardPalette.blue(dark)).frame(width: 77)
+                    count(model.counts?.processing, label: "Processing", tint: BoardPalette.blue(dark)).frame(width: 77)
                     count(model.counts?.waiting, label: "Waiting for operation", tint: BoardPalette.orange(dark)).frame(width: 147)
                     count(model.counts?.done, label: "Done", tint: BoardPalette.green(dark), unread: (model.counts?.done ?? 0) > 0).frame(width: 56)
                 }.frame(height: 54).padding(.top, 12)
@@ -279,6 +309,55 @@ struct BoardView: View {
                 Text(model.pinned ? "Pinned" : "Desktop")
             }.font(.system(size: 11)).foregroundStyle(mutedText).padding(.top, 16.5)
         }.padding(16)
+    }
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Color.clear.frame(width: 34, height: 34).allowsHitTesting(false).accessibilityHidden(true)
+                Color.clear.frame(maxWidth: .infinity).frame(height: 34)
+                Button(action: model.togglePin) {
+                    controlIcon("pin", active: model.pinned).foregroundStyle(model.pinned && model.connected ? BoardPalette.blue(dark) : .primary)
+                }.buttonStyle(BoardControlStyle())
+                    .accessibilityLabel(model.pinned ? "Unpin to desktop" : "Pin above other apps")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("board")) } action: { model.pinFrame = $0 }
+                Button(action: model.toggleSettings) { controlIcon("gearshape", active: model.settingsOpen) }
+                    .buttonStyle(BoardControlStyle())
+                    .focusable().focused($settingsFocused).focusEffectDisabled()
+                    .accessibilityLabel("Settings")
+                    .accessibilityValue(model.settingsOpen ? "Expanded" : "Collapsed")
+                    .accessibilityAction(named: Text("Use keyboard"), model.openKeyboardSettings)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("board")) } action: { model.gearFrame = $0 }
+                Button(action: model.requestQuit) { controlIcon("power") }
+                    .buttonStyle(BoardControlStyle())
+                    .accessibilityLabel("Quit Status Board")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("board")) } action: { model.quitFrame = $0 }
+            }.frame(height: 34).padding(.bottom, 7)
+            Divider().frame(height: 1).padding(.bottom, 6)
+            HStack(spacing: 10) {
+                Image(nsImage: model.icon).resizable().frame(width: 28, height: 28)
+                    .opacity(model.connected ? 1 : 0.65).accessibilityHidden(true)
+                Text("Codex").font(.system(size: 14, weight: .medium))
+                Color.clear.frame(maxWidth: .infinity).frame(height: 30)
+                Button(action: model.toggleDetails) {
+                    controlIcon("chevron.down").rotationEffect(.degrees(180 * model.detailsProgress))
+                }.buttonStyle(BoardControlStyle())
+                    .quickHelp(model.detailsExpanded ? "Hide details" : "Show details")
+                    .accessibilityLabel(model.detailsExpanded ? "Hide details" : "Show details")
+                    .accessibilityValue(model.detailsExpanded ? "Expanded" : "Collapsed")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("board")) } action: { model.disclosureFrame = $0 }
+            }.frame(height: 30)
+        }
+        .background {
+            // Include the card margins and inter-row space, leaving controls and
+            // the settings popover to SwiftUI. Geometry uses the same board space.
+            DragArea(excludes: { point in
+                let point = CGPoint(x: point.x, y: model.panelSize.height - point.y)
+                return [model.gearFrame, model.pinFrame, model.quitFrame, model.disclosureFrame]
+                    .contains { $0.contains(point) }
+                    || (model.settingsOpen && model.menuFrame.contains(point))
+            })
+            .padding(.horizontal, -16).padding(.top, -16).padding(.bottom, -20 * 2 / 3)
+        }
     }
     private func controlIcon(_ name: String, active: Bool = false) -> some View {
         Image(systemName: name).font(.system(size: 15, weight: .regular)).frame(width: 30, height: 30)
@@ -327,7 +406,7 @@ struct BoardView: View {
             .accessibilityLabel("\(value.map(String.init) ?? "Unavailable") \(label == "Done" ? "completed and unread" : label). Open Codex.")
     }
     private func quotaRow(_ quota: QuotaWindow) -> some View {
-        let tone = model.usageIsSaved ? mutedText : quota.tone == .green ? BoardPalette.green(dark) : quota.tone == .orange ? BoardPalette.orange(dark) : BoardPalette.red(dark)
+        let tone = quotaColor(quota)
         return VStack(spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
                 Text(quota.label + (model.usageIsSaved ? " · Saved" : "")).font(.system(size: 12)).foregroundStyle(mutedText)
@@ -345,6 +424,9 @@ struct BoardView: View {
             .quickHelp(TimeLabel.text(prefix: "Reset at", date: quota.resetAt))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(model.usageIsSaved ? "Saved usage. " : "")\(quota.label), \(quota.remaining) percent. \(TimeLabel.text(prefix: "Reset at", date: quota.resetAt))")
+    }
+    private func quotaColor(_ quota: QuotaWindow) -> Color {
+        model.usageIsSaved ? mutedText : quota.tone == .green ? BoardPalette.green(dark) : quota.tone == .orange ? BoardPalette.orange(dark) : BoardPalette.red(dark)
     }
 }
 

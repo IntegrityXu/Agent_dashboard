@@ -21,6 +21,11 @@ final class BoardModel: ObservableObject {
     @Published var loginNeedsApproval = false
     var menuFrame = CGRect.zero
     var gearFrame = CGRect.zero
+    var pinFrame = CGRect.zero
+    var quitFrame = CGRect.zero
+    var disclosureFrame = CGRect.zero
+    @Published var keyboardSettings = false
+    var openKeyboardSettings: () -> Void = {}
     var selectSetting: (Int) -> Void = { _ in }
     var toggleSettings: () -> Void = {}
     var snapshot: LiveSnapshot { presentation.visibleSnapshot(at: now) ?? presentation.latest }
@@ -35,6 +40,13 @@ final class BoardModel: ObservableObject {
     var connected: Bool { presentation.visibleSnapshot(at: now) != nil }
     var usageIsSaved: Bool { !connected || snapshot.quotaUpdatedAt == nil || snapshot.features[.quota]?.state == .saved }
     var windows: [QuotaWindow] { presentation.windows(at: now) }
+    // The decoder derives this label from the 10,080-minute duration.
+    // Bucket keys (primary/secondary) do not identify a weekly window.
+    var weeklyQuota: QuotaWindow? { windows.first { $0.label == "Weekly remaining" } }
+    var compactUsageAccessibilityValue: String {
+        guard let quota = weeklyQuota else { return "Weekly usage unavailable" }
+        return "\(usageIsSaved ? "Saved usage. " : "")Weekly remaining, \(quota.remaining) percent"
+    }
     var agents: [ProcessingAgent] {
         guard let snapshot = presentation.visibleSnapshot(at: now), (snapshot.counts?.processing ?? 0) > 0 else { return [] }
         return snapshot.agents
@@ -51,7 +63,7 @@ final class BoardModel: ObservableObject {
         presentation.connectionLabel(at: now)
     }
     var icon = NSImage(systemSymbolName: "rectangle.stack", accessibilityDescription: "Codex")!
-    let avatar = Bundle.main.url(forResource: "dinosaur-cute", withExtension: "png")
+    let avatar = Bundle.main.url(forResource: "joker_right", withExtension: "png")
         .flatMap { NSImage(contentsOf: $0) }
         ?? NSImage(systemSymbolName: "person.crop.circle", accessibilityDescription: "Avatar")!
     var togglePin: () -> Void = {}
@@ -79,6 +91,15 @@ final class BoardModel: ObservableObject {
 @MainActor
 final class BoardPanel: NSPanel {
     var onMouseDown: (() -> Void)?
+    var allowsKeyboardFocus = false
+    let dragViews = NSHashTable<DragArea.DragView>.weakObjects()
+    private weak var activeDragView: DragArea.DragView?
+    private var ownsDragSequence = false
+    func cancelDrag() {
+        activeDragView?.cancelOperation(nil)
+        activeDragView = nil
+        ownsDragSequence = false
+    }
     let handCursorViews = NSHashTable<PointingHandArea.CursorView>.weakObjects()
     private var ownsHandCursor = false
     private var lastPointer: NSPoint?
@@ -101,12 +122,41 @@ final class BoardPanel: NSPanel {
         if inside { NSCursor.pointingHand.set(); ownsHandCursor = true }
         else { clearHandCursor() }
     }
-    override var canBecomeKey: Bool { true }
+    override var canBecomeKey: Bool { allowsKeyboardFocus }
     override var canBecomeMain: Bool { false }
     override func sendEvent(_ event: NSEvent) {
         if [.leftMouseDown, .rightMouseDown, .keyDown, .scrollWheel].contains(event.type) { QuickHelpController.shared.dismiss() }
         if event.type == .leftMouseDown || event.type == .rightMouseDown { onMouseDown?() }
-        super.sendEvent(event)
+        // Resolve every press from current geometry, including double/triple
+        // clicks. AppKit may otherwise retain a previous click's hosted target.
+        if event.type == .leftMouseDown, attachedSheet == nil {
+            cancelDrag()
+            let candidates = dragViews.allObjects.filter { $0.containsDragPoint(event.locationInWindow) }
+            if let target = candidates.first(where: { $0.click != nil }) ?? candidates.first {
+                activeDragView = target
+                ownsDragSequence = true
+                target.mouseDown(with: event)
+                return
+            }
+        } else if ownsDragSequence && (event.type == .leftMouseDragged || event.type == .leftMouseUp) {
+            let target = activeDragView
+            if event.type == .leftMouseUp {
+                activeDragView = nil; ownsDragSequence = false
+                if target?.window === self { target?.mouseUp(with: event) }
+            } else if target?.window === self {
+                target?.mouseDragged(with: event)
+            }
+            return
+        }
+        // These controls have single-click actions. Do not let AppKit route a
+        // repeated press to a stale hosted target after a custom drag sequence.
+        let delivered: NSEvent
+        if (event.type == .leftMouseDown || event.type == .leftMouseUp), event.clickCount > 1 {
+            delivered = NSEvent.mouseEvent(with: event.type, location: event.locationInWindow,
+                modifierFlags: event.modifierFlags, timestamp: event.timestamp, windowNumber: event.windowNumber,
+                context: nil, eventNumber: event.eventNumber, clickCount: 1, pressure: event.pressure) ?? event
+        } else { delivered = event }
+        super.sendEvent(delivered)
         // SwiftUI hosting can overwrite child cursor rectangles. Apply the
         // count-cell cursor last, without pushing onto the global cursor stack.
         if [.mouseMoved, .cursorUpdate, .mouseEntered, .mouseExited].contains(event.type) {

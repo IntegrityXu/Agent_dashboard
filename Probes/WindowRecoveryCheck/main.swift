@@ -46,6 +46,16 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
         board.panel.isReleasedWhenClosed = false
         board.panel.isFloatingPanel = true
         board.panel.delegate = board
+        board.panel.becomesKeyOnlyIfNeeded = true
+        board.panel.onMouseDown = { [weak self] in self?.board.beginInteraction() }
+        board.model.toggleSettings = { [weak self] in self?.board.toggleSettings() }
+        board.model.selectSetting = { [weak self] index in self?.board.selectSetting(index) }
+        board.model.togglePin = { [weak self] in self?.board.togglePin() }
+        board.model.openKeyboardSettings = { [weak self] in self?.board.openKeyboardSettings() }
+        board.installSettingsDismissal()
+        // Do not let unrelated physical clicks interfere with queued test
+        // gestures. Outside dismissal is explicitly exercised below.
+        if let monitor = board.outsideEventMonitor { NSEvent.removeMonitor(monitor); board.outsideEventMonitor = nil }
         NSWorkspace.shared.notificationCenter.addObserver(board, selector: #selector(BoardDelegate.applicationActivated),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         board.installMenu()
@@ -75,11 +85,9 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
         check(!board.revealPending && board.model.expanded, "Show expands after menu dismissal")
         check(!board.model.pinned && board.raised, "Show leaves saved pin state off")
         check(board.panel.isVisible && board.panel.level == .floating, "Show raises visible native panel above normal level")
-        if let previousApp {
-            board.applicationActivated(Notification(name: NSWorkspace.didActivateApplicationNotification,
-                userInfo: [NSWorkspace.applicationUserInfoKey: previousApp]))
-            check(board.raised, "stale activation notification cannot demote current foreground panel")
-        }
+        board.applicationActivated(Notification(name: NSWorkspace.didActivateApplicationNotification,
+            userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current]))
+        check(board.raised && !board.panel.isKeyWindow, "Show raises the panel without acquiring keyboard focus")
         let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
         let ids = windows.compactMap { $0[kCGWindowNumber as String] as? Int }
         print("Native levels: panel=\(board.panel.level.rawValue), cover=\(cover.level.rawValue)")
@@ -130,24 +138,30 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
         check(!board.raised, "outside interaction works again after menu closes")
         board.showPanel()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.check(NSApp.isActive && self.board.raised, "explicit Show activates app and restores interaction")
+            self.check(!self.board.panel.isKeyWindow && self.board.raised, "explicit Show preserves keyboard focus and restores visibility")
+            // Activate only the test app to exercise a real subsequent app switch.
+            NSApp.activate(ignoringOtherApps: true)
             guard let previousApp = self.previousApp, previousApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
                 self.check(false, "app-switch check requires another running application"); return
             }
-            self.check(previousApp.activate(options: []), "restore previously active app")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.check(!self.board.raised && self.board.panel.level == self.board.desktopLevel,
-                           "real workspace app activation ends temporary reveal")
-                self.checkOverhangingAvatar()
+            self.cover.makeKeyAndOrderFront(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.check(NSApp.isActive, "test app activates before testing a real switch away")
+                self.check(previousApp.activate(options: []), "restore previously active app")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.check(!self.board.raised && self.board.panel.level == self.board.desktopLevel,
+                               "real workspace app activation ends temporary reveal")
+                    self.checkOverhangingAvatar()
+                }
             }
         }
     }
 
-    func clickPanel(at point: NSPoint) {
+    func clickPanel(at point: NSPoint, clicks: Int = 1) {
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: board.panel.windowNumber,
-                context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
+                context: nil, eventNumber: 0, clickCount: clicks, pressure: type == .leftMouseDown ? 1 : 0)!
             NSApp.postEvent(event, atStart: false)
         }
     }
@@ -174,10 +188,10 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func postMouse(_ type: NSEvent.EventType, at point: NSPoint) {
+    func postMouse(_ type: NSEvent.EventType, at point: NSPoint, clicks: Int = 1) {
         let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
             timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: board.panel.windowNumber,
-            context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
+            context: nil, eventNumber: 0, clickCount: clicks, pressure: type == .leftMouseUp ? 0 : 1)!
         NSApp.postEvent(event, atStart: false)
     }
 
@@ -235,9 +249,160 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
                 self.check(self.board.model.expanded, "cancelled avatar press cannot toggle on mouse-up")
                 self.dragPanel(at: NSPoint(x: 118, y: self.board.panel.frame.height - 61), delta: NSPoint(x: 5, y: 5)) {
                     self.check(self.board.model.expanded, "cancellation leaves other drag targets usable")
-                    self.checkCountPointers()
+                    self.checkPassiveInteractions()
                 }
             }
+        }
+    }
+
+    func checkPassiveInteractions() {
+        Task { @MainActor in
+            func settle(_ milliseconds: UInt64 = 70) async {
+                try? await Task.sleep(nanoseconds: milliseconds * 1_000_000)
+            }
+            let editorWindow = NSWindow(contentRect: NSRect(x: 650, y: 100, width: 260, height: 100),
+                                        styleMask: [.titled], backing: .buffered, defer: false)
+            editorWindow.isReleasedWhenClosed = false
+            editorWindow.title = "Typing focus regression check"
+            let field = NSTextField(frame: NSRect(x: 20, y: 30, width: 220, height: 24))
+            field.stringValue = "before after"
+            editorWindow.contentView?.addSubview(field)
+            NSApp.activate(ignoringOtherApps: true)
+            await settle(200)
+            editorWindow.makeKeyAndOrderFront(nil)
+            editorWindow.makeFirstResponder(field)
+            await settle()
+            guard let editor = field.currentEditor() as? NSTextView else {
+                self.check(false, "test editor owns a real field editor"); return
+            }
+            editor.setSelectedRange(NSRange(location: 7, length: 0))
+            @MainActor func unchanged(_ action: String) {
+                self.check(NSApp.keyWindow === editorWindow && editorWindow.firstResponder === editor,
+                           action + " preserves the original input responder")
+                self.check(editor.selectedRange() == NSRange(location: 7, length: 0),
+                           action + " preserves the caret position")
+            }
+            self.check(NSApp.keyWindow === editorWindow && editorWindow.firstResponder === editor, "test typing window starts with keyboard focus")
+            self.board.beginInteraction()
+            unchanged("raising panel")
+            @MainActor func point(_ x: CGFloat, _ top: CGFloat) -> NSPoint {
+                NSPoint(x: x, y: self.board.panel.frame.height - top)
+            }
+            // Regressions for the formerly inert margins and divider gap, plus
+            // click-count reuse after a press on the nondraggable body.
+            let points: [(CGFloat, CGFloat)] = [(118, 41), (118, 84), (200, 127), (20, 108), (118, 61), (200, 108)]
+            for (index, xy) in points.enumerated() {
+                self.clickPanel(at: point(100, 180))
+                await settle(20)
+                let origin = self.board.panel.frame.origin
+                let screen = self.board.panel.convertPoint(toScreen: point(xy.0, xy.1))
+                self.postMouse(.leftMouseDown, at: point(xy.0, xy.1), clicks: index % 2 + 2)
+                await settle(20)
+                for step in 1...6 {
+                    let screenPoint = NSPoint(x: screen.x + CGFloat(step) * 5, y: screen.y + CGFloat(step) * 2)
+                    self.postMouse(.leftMouseDragged, at: self.board.panel.convertPoint(fromScreen: screenPoint), clicks: index % 2 + 2)
+                    self.board.model.now = Date()
+                    await settle(15)
+                }
+                self.check(abs(self.board.panel.frame.minX - origin.x - 30) < 1 &&
+                           abs(self.board.panel.frame.minY - origin.y - 12) < 1,
+                           "continuous header drag \(index + 1) survives margins, repeated clicks and live updates")
+                self.postMouse(.leftMouseUp, at: point(xy.0, xy.1), clicks: index % 2 + 2)
+                await settle()
+                unchanged("header drag \(index + 1)")
+            }
+            let stressOrigin = self.board.panel.frame.origin
+            for index in 0..<20 {
+                self.board.toggleExpanded()
+                await settle(60)
+                self.postMouse(.leftMouseDown, at: NSPoint(x: 27, y: 27), clicks: index % 3 + 1)
+                await settle(30)
+                self.board.model.now = Date()
+                self.postMouse(.leftMouseDragged, at: NSPoint(x: 35, y: 32), clicks: index % 3 + 1)
+                await settle(35)
+                self.check(!self.board.model.expanded && abs(self.board.panel.frame.minX - stressOrigin.x - 8) < 1,
+                           "compact drag \(index + 1) survives repeated collapse and live redraw")
+                self.postMouse(.leftMouseUp, at: NSPoint(x: 27, y: 27), clicks: index % 3 + 1)
+                await settle(35)
+                self.board.toggleExpanded()
+                self.board.panel.setFrameOrigin(stressOrigin)
+                await settle(60)
+            }
+            unchanged("twenty compact drag cycles")
+            let origin = self.board.panel.frame.origin
+            let settingsFrame = self.board.model.gearFrame
+            self.check(!settingsFrame.isEmpty, "Settings reports its rendered hit-test frame")
+            self.clickPanel(at: point(settingsFrame.midX, settingsFrame.midY), clicks: 2)
+            await settle()
+            self.check(self.board.model.settingsOpen, "inactive Settings button responds on the first click")
+            self.check(self.board.panel.frame.origin == origin, "Settings is excluded from dragging")
+            unchanged("opening Settings with the mouse")
+            let muted = self.board.model.muted
+            let menu = self.board.model.menuFrame
+            self.clickPanel(at: point(menu.midX, menu.minY + 21))
+            await settle()
+            self.check(self.board.model.muted != muted && !self.board.model.settingsOpen, "mouse selects Mute without keyboard focus")
+            unchanged("selecting a mouse setting")
+            let pinned = self.board.model.pinned
+            let pinFrame = self.board.model.pinFrame
+            self.check(!pinFrame.isEmpty, "Pin reports its rendered hit-test frame")
+            self.clickPanel(at: point(pinFrame.midX, pinFrame.midY), clicks: 3)
+            await settle()
+            self.check(self.board.model.pinned != pinned, "Pin remains clickable outside drag routing")
+            unchanged("pinning")
+            self.board.togglePin()
+            self.board.showPanel()
+            await settle()
+            unchanged("Show Status Board")
+            self.board.openKeyboardSettings()
+            await settle(150)
+            self.check(self.board.panel.isKeyWindow && self.board.model.keyboardSettings && self.board.model.settingsOpen,
+                       "explicit keyboard entry acquires focus and opens Settings")
+            let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: self.board.panel.windowNumber,
+                context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)!
+            NSApp.postEvent(escape, atStart: false)
+            await settle(150)
+            self.check(!self.board.model.settingsOpen && !self.board.panel.allowsKeyboardFocus,
+                       "Escape exits keyboard mode")
+            unchanged("closing keyboard Settings")
+            // Send typing to whichever window actually owns the keyboard after
+            // panel interaction, rather than invoking the text field directly.
+            let typing = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: NSApp.keyWindow!.windowNumber,
+                context: nil, characters: "X", charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7)!
+            NSApp.postEvent(typing, atStart: false)
+            await settle()
+            self.check(editor.string == "before Xafter", "typing continues at the original caret without another click")
+            // Composition must also survive passive dragging.
+            editor.setMarkedText("拼", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            let marked = editor.markedRange()
+            self.clickPanel(at: point(118, 84))
+            await settle()
+            self.check(editor.hasMarkedText() && editor.markedRange() == marked && NSApp.keyWindow === editorWindow,
+                       "passive click preserves active marked text")
+            editor.unmarkText()
+            self.board.showInfo()
+            await settle(180)
+            guard let info = self.board.infoAlert else { self.check(false, "focus test Info sheet opens"); return }
+            self.board.panel.endSheet(info.window, returnCode: .alertFirstButtonReturn)
+            await settle(350)
+            self.check(!self.board.panel.allowsKeyboardFocus && NSApp.keyWindow === editorWindow && editorWindow.firstResponder === editor,
+                       "Info dismissal restores the original input window")
+            editorWindow.orderOut(nil)
+            self.board.model.muted = muted
+            self.board.audio.setMuted(muted)
+            self.board.defaults.set(muted, forKey: "muteSounds")
+            if let previousApp = self.previousApp {
+                previousApp.activate(options: [])
+                await settle(150)
+                let beforeApp = NSWorkspace.shared.frontmostApplication?.processIdentifier
+                self.clickPanel(at: point(118, 84))
+                await settle()
+                self.check(NSWorkspace.shared.frontmostApplication?.processIdentifier == beforeApp && !self.board.panel.isKeyWindow,
+                           "passive panel click preserves another application's foreground focus")
+            }
+            self.checkCountPointers()
         }
     }
 
@@ -436,6 +601,7 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
                 context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
             _ = board.handleSettingsEvent(event)
         }
+        board.beginKeyboardInteraction()
         board.model.settingsOpen = true
         board.model.menuSelection = BoardSetting.launchAtLogin.rawValue
         key(125)
@@ -526,9 +692,12 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
                 let output = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("quit-confirmation.png")
                 try? bitmap.representation(using: .png, properties: [:])?.write(to: output)
             }
-            self.board.panel.endSheet(alert.window, returnCode: .alertFirstButtonReturn)
+            let enter = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: alert.window.windowNumber,
+                context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
+            NSApp.postEvent(enter, atStart: false)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                self.check(self.board.quitAlert == nil && self.board.panel.isVisible, "Cancel closes confirmation and keeps the board running")
+                self.check(self.board.quitAlert == nil && self.board.panel.isVisible, "Return chooses Cancel and keeps the board running")
                 self.verifyingQuit = true
                 self.board.quit()
                 guard let confirm = self.board.quitAlert else { self.check(false, "confirmation can reopen after Cancel"); return }

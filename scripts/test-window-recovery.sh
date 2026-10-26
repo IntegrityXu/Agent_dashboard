@@ -38,5 +38,6 @@ xcrun swiftc -parse-as-library -swift-version 6 -module-cache-path "$ROOT/.build
   -I "$DEBUG/Modules" -I "$ROOT/Packages/StatusBoardCore/Sources/StatusBoardSQLite/include" "${APP_SOURCES[@]}" "$ROOT/Probes/WindowRecoveryCheck/main.swift" \
   -Xlinker -filelist -Xlinker "$OUT/objects.txt" \
   -o "$OUT/WindowRecoveryCheck"
-cp "$ROOT/StatusBoard/Resources/dinosaur-cute.png" "$OUT/dinosaur-cute.png"
+cp "$ROOT/StatusBoard/Resources/joker_right.png" "$OUT/joker_right.png"
+cp "$ROOT/StatusBoard/Resources/crown.png" "$OUT/crown.png"
 "$OUT/WindowRecoveryCheck" --render-design-cases
