@@ -252,7 +252,8 @@ Codex 的版本号用于诊断，不采用固定构建白名单。适配层会�
 
 - [版本更新记录](CHANGELOG.md)
 
-- [产品设计](docs/status-board-product-design-v0.1.md)
+- [当前完整 PRD（0.2.2 build 39，不限定技术栈）](docs/status-board-prd-v0.2.2.md)
+- [早期产品设计](docs/status-board-product-design-v0.1.md)
 - [技术设计](docs/status-board-technical-design-v0.1.md)
 - [实施计划与验收要求](docs/status-board-implementation-plan-v0.1.md)
 - [当前实现与验证索引](docs/verification/results.md)
