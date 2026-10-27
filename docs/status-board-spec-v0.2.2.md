@@ -2,10 +2,11 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | 0.1（草案，待上游评审） |
+| 文档版本 | 0.2（按 #2 审查意见修订） |
 | 上游需求 | [`docs/status-board-prd-v0.2.2.md`](status-board-prd-v0.2.2.md) 文档版本 1.0（commit `3a3950f`） |
 | 产品基线 | Status Board 0.2.2 build 39 个人预览版 |
-| 编写日期 | 2026-10-27 |
+| 编写日期 | 2026-10-27（0.1）；2026-10-27 修订（0.2） |
+| 评审记录 | IntegrityXu/Agent_dashboard#2 |
 | 用途 | 把 PRD 的产品语义收敛为可直接实现、可直接写测试的规则：数据模型、判定函数、状态机、参数表、不变量和追溯矩阵 |
 | 技术约束 | 与 PRD 一致，不限定语言、框架、存储或通信实现；文中伪代码只表达语义 |
 
@@ -13,9 +14,20 @@
 
 ### 0.1 与 PRD 的关系
 
-- PRD 定义“产品应当表现成什么样”；本 SPEC 定义“按什么规则算出来”。两者冲突时**以 PRD 为准**，并在第 22 节登记为待澄清项。
-- PRD 没写、但实现等价重写必须作出选择的地方，本 SPEC 采用当前实现（build 39）的行为作为默认值，标注 **〔据实现〕**，并同时列入第 22 节请上游确认是否属于产品承诺。
+- PRD 定义“产品应当表现成什么样”；本 SPEC 定义“按什么规则算出来”。两者冲突时**以 PRD 为准**，并在第 22 节登记。
 - 本 SPEC 不新增功能，不修改 PRD 第 2.2 节的排除范围。
+
+### 0.1.1 规则来源标记
+
+每条规则的约束力取决于来源。未加标记的规则直接来自 PRD 原文；其余规则必须带下列标记之一：
+
+| 标记 | 含义 | 约束力 |
+| --- | --- | --- |
+| 〔现有〕 | build 39 源码的当前行为，PRD 未写明，上游尚未确认为产品承诺 | 等价重写 SHOULD 保持；改变时须在实现说明中写明。**不得**作为 MUST 引用 |
+| 〔确认〕 | 上游在 #2 中确认应写入文档的现有行为或产品要求 | 与 PRD 原文同等，可用 MUST |
+| 〔待决〕 | 本 SPEC 或评审提出的建议，**当前未实现**或尚未决定 | 不构成要求；对应验收用例单列（21.3），不能视为当前已满足 |
+
+0.1 版中的〔据实现〕标记已全部按上表重新归类。
 
 ### 0.2 规范用语
 
@@ -35,8 +47,9 @@
 | `INV-nn` | 系统不变量，任何时刻都必须成立 |
 | `R-<域>-nn` | 本 SPEC 的规则条目，可单独写测试 |
 | `K-<名称>` | 具名参数常量（第 15 节） |
-| `Q-nn` | 待上游澄清的问题（第 22 节） |
-| `AX-nn` | 本 SPEC 建议补充的验收用例（第 21.2 节） |
+| `Q-nn` | 0.1 版提出的澄清问题及处理结果（第 22.1 节） |
+| `I-nn` | 需要改代码或做产品决策的改进事项（第 22.3 节） |
+| `AX-nn` | 本 SPEC 建议补充的验收用例：现有行为（21.2）、待决改进（21.3） |
 
 ## 1 系统分解
 
@@ -118,19 +131,28 @@ type TurnStatus = "inProgress" | "completed" | "failed" | "interrupted" | string
 
 interface LiveObservation {
   conversationId: string
+  owner: string                  // 当前已验证的流 owner（发送方）
+  revision: number               // 该 owner 流的版本号，连续递增
   runId?: string                 // 当前执行轮次身份
   runtime?: Runtime
+  activeFlags: Set<string>       // 运行时标记，含 waitingOnUserInput / waitingOnApproval
   turnStatus?: TurnStatus        // 缺失 = 当前没有轮次状态
-  pendingRequestIds: Set<string> // 已识别的待回答/待批准请求
+  pendingRequestIds: Set<string> // 已识别的待回答/待批准请求，限当前 runId
   hasUnclassifiedRequests: boolean
-  unansweredQuestionIds: Set<string>
+  unansweredQuestionIds: Set<string> // 仅当 turnStatus == "inProgress" 时非空，见 R-ASK-01
   unread?: boolean               // 缺失 = 未读状态未确认
   hasLatestTurnCoverage: boolean // 已确认观察覆盖到最新轮次
-  isHeartbeat: boolean           // 轮次由 heartbeat 自动化发起，见 Q-03
-  observedAt: Instant
+  isHeartbeat: boolean           // 见下方术语
+  observedAt: Instant            // 只用于新鲜度判断，不用于版本仲裁
   connectionGeneration: Generation
   continuity: "ok" | "gap"       // 版本缺口或已知流中断 = gap
 }
+
+// 统一的“待用户处理”判定，覆盖请求、运行时标记和有效异步问题
+isWaitingForUser(o) :=
+     |o.pendingRequestIds| > 0
+  || |o.unansweredQuestionIds| > 0
+  || o.activeFlags ∩ {"waitingOnUserInput", "waitingOnApproval"} ≠ ∅
 
 type TaskState =
   | "processing" | "waitingUser" | "waitingError"
@@ -174,6 +196,8 @@ interface Preferences {          // 唯一持久化的用户状态（另加 Save
 }
 ```
 
+**术语：Heartbeat 任务**〔确认〕当前轮次的自动化类型为 `heartbeat`（`automationKind == "heartbeat"`）的会话。它照常参与计数、角标和视觉更新，只抑制提示音。其他自动化类型不抑制声音；是否扩大范围属于另行决定的产品问题。
+
 - **R-DATA-01** 原始认证材料 MUST 只存在于内存，MUST NOT 进入 `SavedUsage`、`Preferences` 或日志。
 - **R-DATA-02** 任何会话正文、工具参数、命令、问答正文、错误原文 MUST NOT 出现在上述任何持久化类型或普通日志中（PRD 16.2）。
 - **R-DATA-03** `LiveObservation`、`AlertEvent`、计数、角标、Agent 活动、休眠计时 MUST NOT 持久化（PRD 9.3、15）。
@@ -214,7 +238,12 @@ inScope(c) :=
 
 ### 4.2 去重
 
-- **R-SCOPE-05** 去重键为会话 ID。同一会话的多份观察（多窗口）MUST 合并为一份，以 `(connectionGeneration, observedAt)` 最新者为准。
+- **R-SCOPE-05** 去重键为会话 ID。每个会话在任一时刻只有一个被接受的观察流，由 owner 与版本号仲裁，**不按接收时间**仲裁〔现有〕：
+  1. 只接受来自当前已验证 owner 的消息；非 owner 的增量消息 MUST 拒绝，并使该流失效、重新同步。
+  2. 增量消息必须满足 `baseRevision == 当前 revision` 且 `revision == baseRevision + 1`；否则视为版本缺口（`continuity = gap`）。`revision ≤ 当前 revision` 的重放消息直接忽略。
+  3. 同一 owner 的快照若 `revision` 低于当前值，忽略。
+  4. owner 改变时，丢弃旧流并等待新 owner 的快照；新快照只建立静默基线（不产生提示音和角标事件）。
+  5. `observedAt` 只用于新鲜度判断（INV-07），不得用来裁决两份观察谁更新。
 
 ## 5 状态判定（F02、F03、PRD 6.1）
 
@@ -224,7 +253,7 @@ inScope(c) :=
 
 ```
 classify(o: LiveObservation): TaskState
-  1  if |o.pendingRequestIds| > 0 or |o.unansweredQuestionIds| > 0  → waitingUser
+  1  if isWaitingForUser(o)                                         → waitingUser
   2  if o.hasUnclassifiedRequests                                   → unknown
   3  if o.runtime == "active"                                       → processing
   4  if o.runtime == "systemError"                                  → waitingError
@@ -248,16 +277,18 @@ classify(o: LiveObservation): TaskState
 | idle、stopped | 不计 | 是 |
 | unknown | 不计 | **否** |
 
-- **R-CLASS-01** 步骤 1 中待处理事项无论多少个，Waiting 只 +1（INV-01）。
+- **R-CLASS-01** 步骤 1 中待处理事项无论多少个，Waiting 只 +1（INV-01）。只有运行时等待标记、请求详情尚未到达时，步骤 1 同样命中，MUST NOT 落到步骤 3 判为 Processing（反例 AX-11）。
 - **R-CLASS-02** 观察有效性先于判定：`continuity == "gap"`、身份不匹配、关键字段无法解析的观察 MUST 被视为“无观察”，不进入 `classify`，并触发该会话重新同步（PRD 14.2 “单会话数据不连续”行）。
 - **R-CLASS-03** 未知的 `runtime` / `turnStatus` 字符串 MUST 归为 unknown，MUST NOT 映射到最接近的已知值。
-- **R-CLASS-04** 来自持久历史的 `inProgress` MUST NOT 产生 processing；processing 只能来自当前连接代次内的实时观察。
-- **R-CLASS-05** `waitingError` 的离开条件只有：新轮次开始、会话离开范围、或观察失效。Codex 已读变化 MUST NOT 清除 waitingError。〔据实现〕见 Q-04。
+- **R-CLASS-04** 来自持久历史的 `inProgress` MUST NOT 产生 processing；processing 只能来自当前有效的实时观察。“当前有效”指：来自 R-SCOPE-05 接受的流、版本连续、身份匹配、未超过新鲜度。实时观察与磁盘历史是两类不同证据，第 5 步与 PRD 6.1 末段并不矛盾〔确认〕。适配器不接受 `notLoaded` 作为有效 runtime〔现有〕，因此“runtime 为 notLoaded、轮次为 inProgress”的组合不能默认判为 Processing。
+- **R-CLASS-05** 分类是对每次新观察**重新求值**，不是有记忆的状态机。因此 waitingError 跟随新的可信状态变化离开，例如：同一 `runId` 的 runtime 恢复为 `active`（回到 processing）、新轮次开始、会话离开范围、观察失效〔确认〕。Codex 已读变化本身 MUST NOT 解除 waitingError〔确认〕。是否增加“用户确认失败后清除”的机制〔待决〕，属于新增产品决策。
 
 ### 5.2 异步问题（PRD 6.4）
 
-- **R-ASK-01** `unansweredQuestionIds` 只包含属于 `o.runId` 的问题；轮次改变时集合 MUST 清空。
-- **R-ASK-02** 问题 `q` 只能被“问题身份等于 `q` 且被来源标记为已接受”的回答移出集合。修改问题文案、未接受回复、身份不匹配 MUST NOT 移出。
+- **R-ASK-01** 只有**当前仍在执行**的轮次（`turnStatus == "inProgress"`）中的未回答异步问题参与等待判定。轮次改变，或同一轮次进入 `completed` / `failed` / `interrupted` 时，旧问题 MUST NOT 再贡献 Waiting，否则步骤 1 会压过终态判定（反例 AX-12）。
+- **R-ASK-02** 问题有两种互不相同的移出原因：
+  1. **问题失效**：所属轮次已不在执行（R-ASK-01）。
+  2. **接受回答**：出现引用该问题身份的有效回答。〔现有〕有效回答指用户消息，或状态为 `accepted` 的 steering 消息，且其内容为单个文本项、引用了问题身份。修改问题文案、未接受的回复、身份不匹配 MUST NOT 移出。
 - **R-ASK-03** 问题正文、选项、回答 MUST NOT 被保存或展示。
 
 ## 6 聚合与 `—`/0 判定（PRD 3.2）
@@ -275,9 +306,9 @@ showCounts :=
 display = showCounts ? counts : "—"（三项同时）
 ```
 
-- **R-AGG-01** `total == 0` 且身份已验证、清单成功时 MUST 显示 `0 / 0 / 0`。〔据实现〕PRD 原文为“可以”，见 Q-05。
+- **R-AGG-01** 〔确认〕同时满足以下前提时 MUST 显示 `0 / 0 / 0`：身份已验证；范围清单成功确认为空（`total == 0`）；连接与数据有效（不在 R-SCOPE-04 隐藏状态、无全局兼容性问题、快照新鲜）。仅仅看到空集合、而前提不全时 MUST 显示 `—`。PRD 3.2 的“可以”建议改为“应”。
 - **R-AGG-02** `restoredCompleted > 0`（已确认有完成历史，但全部已读）时 Done MUST 可以为 0，即使 `covered == 0`（PRD 3.2 第 6 条）。
-- **R-AGG-03** `—` 是三项一起出现的；本 SPEC 不定义“Processing 有值、Done 为 `—`”的混合态。〔据实现〕
+- **R-AGG-03** 〔现有〕`—` 是三项一起出现的；不存在“Processing 有值、Done 为 `—`”的混合态。
 - **R-AGG-04** `partial := covered < total || unassigned > 0`。`partial` 为真时数字照常显示，Info MUST 披露 `covered/total` 与 `unassigned`。
 
 ## 7 完成未读恢复（F04、PRD 7）
@@ -323,7 +354,8 @@ acceptSideChat(s) :=
 ```
 
 - **R-SIDE-01** 收到未知会话的广播 MUST NOT 视为接纳；未接纳前不计数、不发声。
-- **R-SIDE-02** 待验证 + 已接纳合计上限 `K-SIDECHAT-CAP`（64）。超出时新候选 MUST 不被接纳，且 Info 的 Live tasks 状态 SHOULD 体现部分覆盖。见 Q-08。
+- **R-SIDE-02** 待验证 + 已接纳合计上限 `K-SIDECHAT-CAP`（64）。〔现有〕达到上限后，新候选被直接忽略；已接纳的侧聊不会被淘汰；Info **不会**因为超限而显示部分覆盖。
+- **R-SIDE-02a** 〔待决〕超限时在 Info 中披露部分覆盖。若采纳，需要另外定义“超限状态”的进入与解除条件。对应验收 AX-05 列在 21.3，不属于当前行为。
 
 ### 8.2 生命周期状态机
 
@@ -341,7 +373,7 @@ acceptSideChat(s) :=
 
 ## 9 Agent 活动（F06、PRD 8.2）
 
-- **R-AGENT-01** 只为 `classify == processing` 且 `turnStatus ∉ {completed, failed, interrupted}` 的主任务投影活动行：一个 `root` 加已验证子 Agent。已接纳侧聊也视为主任务，会有自己的 `root` 行〔据实现，见 Q-07〕。子 Agent 行只在主任务 `hasLatestTurnCoverage` 时展开。
+- **R-AGENT-01** 只为 `classify == processing` 且 `turnStatus ∉ {completed, failed, interrupted}` 的主任务投影活动行：一个 `root` 加已验证子 Agent。〔确认〕“已纳入统计的顶层任务”包括已验证的临时侧聊；满足执行条件的侧聊也有自己的 `root` 行。子 Agent 仍不增加顶层计数。子 Agent 行只在主任务 `hasLatestTurnCoverage` 时展开。
 - **R-AGENT-02** 活动列表以 `(conversationId, runId)` 为键；`runId` 变化或任务离开 processing 时 MUST 立即丢弃旧列表。
 - **R-AGENT-03** 显示名取路径末段；过长时中间截断，状态后缀 MUST 完整可见。后缀映射：`running → "....."`、`done → " done"`、`stopped → " stopped"`、`waiting → " waiting"`、`failed → " failed"`、`unknown → " —"`。
 - **R-AGENT-04** 可见高度最多 5 行，超出在列表内滚动；悬浮显示完整路径和状态。
@@ -351,17 +383,20 @@ acceptSideChat(s) :=
 
 ### 10.1 解析
 
-- **R-QUOTA-01** 一个窗口有效当且仅当：`key` 非空；`usedPercent` 为有限数且 ∈ [0, 100]；能得到标签（R-QUOTA-03）。任一不满足 → 该次额度响应视为**格式异常**（不是空额度）。
+- **R-QUOTA-01** 〔现有〕逐个窗口解析：
+  - `usedPercent` 不是有限数或不在 [0, 100]，或给出的 `durationMinutes ≤ 0` → 整次响应视为**格式异常**（不是空额度）。
+  - 未给出 `durationMinutes` → 协议允许周期未知，**跳过该窗口**，不视为格式异常，也不编造标签（PRD 9.1 “周期未知”行）。
+  - 选择分组：响应含 `rateLimitsByLimitId` 时只取其中的 `codex` 分组，缺少该分组视为合法空额度；否则取 `rateLimits`。
 - **R-QUOTA-02** `remaining = floor(100 − usedPercent)`。
-- **R-QUOTA-03** 标签优先级〔据实现，见 Q-02〕：
-  1. 来源给出非空权威标签 → 使用之；
-  2. `durationMinutes == 10080` → `Weekly remaining`；
-  3. 整除 1440 → `{n}-day remaining`；
-  4. 整除 60 → `{n}-hour remaining`；
-  5. 其他正整数 → `{n}-minute remaining`；
-  6. 无标签且无时长 → 窗口无效。
-- **R-QUOTA-04** 识别周额度只看 `durationMinutes == 10080`，MUST NOT 依据字段位置（主/次）推断（A22）。当前适配主、次两个窗口，优先 Codex 分组。
-- **R-QUOTA-05** 同组内 `key` 重复 → 格式异常。
+- **R-QUOTA-03** 〔现有〕标签只由 `durationMinutes` 生成；当前解码器**不读取**来源标签：
+  1. `== 10080` → `Weekly remaining`；
+  2. 整除 1440 → `{n}-day remaining`；
+  3. 整除 60 → `{n}-hour remaining`；
+  4. 其他正整数 → `{n}-minute remaining`。
+
+  生成文案的具体格式是否作为产品承诺〔待决〕。领域类型虽然允许传入权威标签，但没有任何入口使用它。
+- **R-QUOTA-04** 识别周额度 MUST NOT 依据字段位置（主/次）推断（A22）。〔现有〕当前的识别方式是比对标签文案 `== "Weekly remaining"`，它间接等价于 `durationMinutes == 10080`。〔待决〕若将来支持任意来源标签，MUST 先引入独立的周期语义字段（例如 `isWeekly` 或保留 `durationMinutes`），紧凑外圈改为按该字段识别，否则换文案会让外圈失效。
+- **R-QUOTA-05** 当前固定只产生 `primary`、`secondary` 两个 key；缓存加载时 key 重复 → 丢弃缓存（R-CACHE-05）。
 
 ### 10.2 响应处理
 
@@ -377,7 +412,7 @@ acceptSideChat(s) :=
 
 - **R-QUOTA-06** 实时颜色：`remaining > 40` 绿；`20 < remaining ≤ 40` 橙；`≤ 20` 红。Saved 一律灰。
 - **R-QUOTA-07** 紧凑外圈只表达周额度，从顶部中点顺时针沿圆角方形路径绘制，长度 = `remaining / 100`。无周额度 → 只画灰色底圈。
-- **R-QUOTA-08** 重置时间悬浮文本格式 `Reset at MMM d, yyyy, h:mm a z`（en_US，本机时区）；缺失为 `Reset at —`。〔据实现〕
+- **R-QUOTA-08** 〔现有〕重置时间悬浮文本格式 `Reset at MMM d, yyyy, h:mm a z`（en_US，本机时区）；缺失为 `Reset at —`。
 
 ### 10.4 缓存
 
@@ -438,17 +473,49 @@ asleep := now − lastCodexActivityAt ≥ K-AVATAR-IDLE（30 分钟）
 
 ### 13.1 事件生成
 
-事件只由**实时连续观察中的状态转移**生成，MUST NOT 由计数差值推导。
+事件只由**实时连续观察中的状态转移**生成，MUST NOT 由计数差值推导。三种事件**各用独立判定**，普通等待与停止失败互不重叠。
 
-| kind | 生成条件（`before → after`，同一会话） |
-| --- | --- |
-| completed | `before` 属于同一 `runId` 且非 completed，`after.turnStatus == "completed"`；与 `after.unread` 无关（A10） |
-| waiting | `kindOf(before) ≠ waiting` 且 `kindOf(after) == waiting`，或 `runId` 变化且新轮次进入 waiting |
-| failed | 进入 waitingError 且 `before` 不是 waitingError；`runtime == "active"`（自动重试中）不触发 |
+公共前提（任一不满足则本次转移不产生任何事件）：
 
-- **R-ALERT-01** 以下情况 MUST NOT 生成事件：`before` 缺失（基线、重连、侧聊接纳、恢复）；`after.isHeartbeat`；用户主动停止（→ stopped）；子 Agent。
-- **R-ALERT-02** `occurrence` 去重键：`completed:{conv}:{run}`、`failed:{conv}:{run}`、`waiting:{conv}:{run}:{waitEpisode}`。`waitEpisode` 在每次“离开 waiting 后再进入”时 +1；同一段 waiting 中新增问题、元数据更新、请求记录与等待标记分别到达，MUST 复用同一 `waitEpisode`（A27）。
-- **R-ALERT-03** 已消费 `occurrence` 集合的作用域为身份代次；身份变化时清空。集合保留期限见 Q-09。
+```
+before 存在                                  // 非基线、非重连、非侧聊接纳、非恢复
+after 来自 R-SCOPE-05 接受的增量消息          // 快照只建立基线
+!after.isHeartbeat
+before.hasLatestTurnCoverage && after.hasLatestTurnCoverage
+```
+
+各事件判定：
+
+```
+stoppedFailure(o) := o.runtime == "systemError"
+                  || (o.turnStatus == "failed" && o.runtime != "active")
+
+completed:  before.runId == after.runId（非空）
+            && before.turnStatus != "completed"
+            && (before.turnStatus == "inProgress" || before.runtime == "active")
+            && after.turnStatus == "completed"
+            // 与 after.unread 无关（A10）
+
+failed:     before.runId == after.runId（非空）
+            && stoppedFailure(after) && !stoppedFailure(before)
+            // failed 但仍 active（自动重试）不满足 stoppedFailure
+
+waiting:    isWaitingForUser(after)
+            && (!isWaitingForUser(before) || before.runId != after.runId)
+            && after.runId 非空
+            // 只看用户输入/批准/异步问题，不包含 waitingError
+```
+
+- **R-ALERT-01** 以下情况 MUST NOT 生成事件：公共前提不成立；用户主动停止（→ stopped）；子 Agent；单纯的状态修正（例如 `before` 既不是 inProgress 也不是 active，`after` 却是 completed，不算新完成）。
+- **R-ALERT-01a** 一次 Processing → 停止失败只产生 failed 事件，MUST NOT 同时产生 waiting 事件（反例 AX-13）。上面的判定已经保证这一点：waitingError 不满足 `isWaitingForUser`。
+- **R-ALERT-02** 〔现有〕`occurrence` 去重键：
+  - completed：`{conv}:{run}:completed`
+  - failed：`{conv}:{run}:failed`
+  - waiting：若有待处理请求，取排序后的第一个请求身份，即 `{conv}:{firstPendingRequestId}`；否则（只有运行时标记或异步问题）取 `{conv}:{run}:wait:{owner}:{revision}`。
+
+  这样，请求记录与等待标记分两次到达时，只有“进入等待”的那次转移会生成事件，后续补充不再满足 waiting 判定（A27）。0.1 版中的 `waitEpisode` 计数器不是现有实现，已删除。
+- **R-ALERT-03** 〔现有〕已消费 `occurrence` 集合的作用域为身份代次，只在身份变化时清空；同一身份下没有回收，会单调增长。是否会超出 19.1 的内存指标尚无测量。
+- **R-ALERT-03a** 〔待决〕回收已消费集合。前提是先定义**重放边界**，保证被回收的事件不会因为重放、重连或旧 owner 迟到消息而重新被接受。10 秒播放有效期 MUST NOT 直接当作去重保留期限；“会话离开范围即删除”“超过一轮即删除”等方案须验证后再采用。对应验收 AX-08 列在 21.3。
 
 ### 13.2 播放管道
 
@@ -492,7 +559,7 @@ allowed()  := 已连接 && 身份已验证 && !muted && !systemAsleep && !quitti
 
 每个功能独立取值 `available | checking | partial | unavailable | incompatible | saved`；`partial / unavailable / incompatible / saved` 视为**降级**。
 
-| 功能 | 规则〔据实现〕 |
+| 功能 | 规则〔现有〕 |
 | --- | --- |
 | Live tasks | 连接或清单失败 → unavailable / incompatible；部分会话观察异常 → `covered > 0 ? partial : incompatible`；初始化中或 `covered == 0 && total > 0` → checking；否则 available |
 | Usage | 额度来源失败 → unavailable / incompatible；若已有本次会话读到的额度则改为 saved；从未读到 → checking |
@@ -503,13 +570,13 @@ allowed()  := 已连接 && 身份已验证 && !muted && !systemAsleep && !quitti
 
 | 顺序 | 条件 | 标签 |
 | --- | --- | --- |
-| 1 | 存在兼容性问题（关键协议/格式不可解释） | `Incompatible Codex data` |
-| 2 | 有可见实时快照（R-AVAIL-02）且任一功能降级 | `Connected · Limited` |
+| 1 | 存在**全局**兼容性问题（会话协调层无法安全解释关键协议） | `Incompatible Codex data` |
+| 2 | 有可见实时快照（R-AVAIL-02）且任一功能降级（含单功能 `incompatible`） | `Connected · Limited` |
 | 3 | 有可见实时快照 | `Connected` |
 | 4 | 无可见实时快照，且同身份 Saved 窗口非空 | `Disconnected · Saved usage` |
 | 5 | 其他 | `Disconnected` |
 
-该优先级为〔据实现〕，PRD 只列了含义，见 Q-06。
+〔确认〕该优先级应写入文档。全局兼容性问题与单功能不兼容 MUST 区分：某一功能（如 Usage 格式异常）为 `incompatible` 时，只要其他来源有效，仍按局部降级显示 `Connected · Limited`，MUST NOT 提升为整体 `Incompatible Codex data`。
 
 - **R-AVAIL-01** `Connected` MUST NOT 被解读为全范围覆盖；覆盖率只在 Info 中披露。
 - **R-AVAIL-02** 可见实时快照：身份匹配、年龄 ≤ 10 秒，且（当前已连接，或连续失败未超过 `K-VISUAL-GRACE` 3 秒）。身份失效、不兼容、明确任务失效不享受 3 秒宽限。
@@ -528,7 +595,11 @@ allowed()  := 已连接 && 身份已验证 && !muted && !systemAsleep && !quitti
 | Codex build | 仅诊断用途 |
 | `Last complete sync` | 见 R-INFO-01；未知为 `—` |
 
-- **R-INFO-01** 完整同步时间：当一次快照满足 `connected && covered == total && unassigned == 0` 时记录。PRD 3 还要求“无功能降级”，当前实现未检查，且记录的时间值取自额度读取时间而非快照时间，见 Q-01。
+- **R-INFO-01** 完整同步时间〔现有〕：
+  1. 一次快照满足 `connected && covered == total && unassigned == 0`，**且没有任何功能降级**时，才建立本次完整同步时间；任一功能降级时，本次值被清空。这与 PRD 3 一致。
+  2. Info 显示的是**最近一次**成功的完整同步时间（随额度缓存保存）；降级期间仍显示上一次的值，这不表示本次同步成功。
+  3. 记录下来的时间值取自额度读取时间（`quotaReadAt`），不是完整同步实际发生的时间；保存也依附于额度缓存的写入。
+- **R-INFO-01a** 〔待决〕把完整同步时间与额度读取解耦：独立记录完整同步实际发生的时间，独立更新和保存。对应验收 AX-09 列在 21.3。
 - **R-INFO-02** Info 打开时是静态视图，不承诺持续刷新；打开 Info 会展开主面板。
 
 ## 15 参数表
@@ -551,7 +622,8 @@ allowed()  := 已连接 && 身份已验证 && !muted && !systemAsleep && !quitti
 | K-HISTORY-DEBOUNCE | 约 250 毫秒 | 变更合并 | 14.3 |
 | K-READ-FIRST | 约 1 秒 | 实时 Done 首次已读核对 | 14.3 |
 | K-READ-INTERVAL | 约 5 秒 | 实时 Done 后续核对 | 14.3 |
-| K-DISCOVERY-RETRY | 约 15 秒 | 来源发现重试 | 14.3 |
+| K-APP-DISCOVERY | 启动时一次 | 发现 Codex 应用安装位置〔现有〕 | 5.1 |
+| K-SOURCE-DISCOVERY-RETRY | 约 15 秒 | 监控运行中的会话来源 / owner 发现重试（不重新发现应用安装位置） | 14.3 |
 | K-BACKOFF | 1, 2, 4, 8, 15, 15… 秒 | 断线退避；健康连接重置 | 14.3 |
 | K-ALERT-TTL | 10 秒 | 事件有效期 | 11.2 |
 | K-AVATAR-IDLE | 30 分钟 | 休眠阈值 | 10.2 |
@@ -614,6 +686,7 @@ Pinned   ──Unpin（来自本次交互）──────────► Te
 - **R-FOCUS-01** 被动操作（点击头像、拖动、Pin、展开/收起、详情切换、鼠标操作设置菜单）MUST 保留原应用的键盘焦点。
 - **R-FOCUS-02** 主动键盘场景（Keyboard Settings、Info、登录启动错误提示、退出确认）MAY 临时获取焦点；结束后归还给原应用，若期间用户已主动切换到别的应用则不切回。
 - **R-FOCUS-03** 点击任务计数或 Open Codex 是显式打开操作，MAY 切到 Codex；只激活应用，不定位会话（A43）。
+- **R-FOCUS-04** 〔确认〕计数显示为 `—` 时，任务计数区域仍可点击打开 Codex，并显示手形指针；数值不可用不妨碍用户回到 Codex。可点击性仍受详情可见性、详情动画（R-DETAIL-01）和设置菜单遮挡的限制。
 
 ### 16.5 详情区
 
@@ -658,7 +731,7 @@ Pinned   ──Unpin（来自本次交互）──────────► Te
 | 事件 | 行为 |
 | --- | --- |
 | 启动 | 单实例检查（重复启动 → 唤出已有实例并退出新实例）→ 菜单栏 → 恢复 Preferences（首次：紧凑、未置顶、未静音、`detailsVisible = true`、不注册登录启动）→ 发现 Codex → 验证身份 → 各来源独立加载 → 首轮数据只建基线 |
-| 未发现 Codex | 保留组件与菜单栏；Info 显示 `Codex app not found`；当前版本需重启 Status Board 才会重新发现（见 Q-10） |
+| 未发现 Codex | 保留组件与菜单栏；Info 显示 `Codex app not found`。应用安装位置只在启动时发现（K-APP-DISCOVERY），需重启 Status Board 才会重新发现〔现有〕。这与 K-SOURCE-DISCOVERY-RETRY 是两种不同的发现过程，并不矛盾。运行中自动重新发现应用安装位置〔待决〕，可作为独立改进 |
 | 系统睡眠 | 暂停所有来源；按 13.3 清空声音 |
 | 系统唤醒 | 视为连接代次变化：重连、重新验证身份、重建基线；不补播 |
 | 身份变化 | 身份代次 +1：丢弃旧观察、旧订阅、旧事件、旧 CompactTracker；隐藏不匹配缓存；新身份静默建基线 |
@@ -673,7 +746,7 @@ Pinned   ──Unpin（来自本次交互）──────────► Te
 
 | 数据 | 位置 | 清理 |
 | --- | --- | --- |
-| Preferences + SavedUsage | 偏好域 `local.statusboard.app` | 退出应用后由用户删除该偏好域（见 Q-11 关于原文措辞） |
+| Preferences + SavedUsage | 偏好域 `local.statusboard.app` | 〔确认〕用户手动操作：先退出应用，再执行 `defaults delete local.statusboard.app`。应用退出时**不会**自动删除 |
 | 诊断日志 | `~/Library/Logs/Status Board/diagnostics.jsonl` 及 `.1`，各 ≤ 1 MiB | 用户手动删除 |
 | 登录启动 | 系统登录项 | 设置或系统设置关闭 |
 | 显式调试输出 | 启用者指定的已有文件 | 启用者负责 |
@@ -699,57 +772,103 @@ Pinned   ──Unpin（来自本次交互）──────────► Te
 | 功能 | SPEC 章节 | PRD 验收 | 建议补充 |
 | --- | --- | --- | --- |
 | F01 启动与连接 | 1.2、14、18 | A01、A38、A49、A50 | AX-01、AX-02 |
-| F02 任务统计 | 4、5、6 | A02、A03、A15、A16 | AX-03 |
-| F03 等待识别 | 5.1、5.2 | A04–A08 | AX-04 |
+| F02 任务统计 | 4、5、6 | A02、A03、A15、A16 | AX-03、AX-14 |
+| F03 等待识别 | 5.1、5.2 | A04–A08 | AX-04、AX-11、AX-12 |
 | F04 完成未读恢复 | 7 | A10–A14 | — |
-| F05 临时侧聊 | 8 | A18、A19 | AX-05 |
+| F05 临时侧聊 | 8 | A18、A19 | AX-15；待决 AX-05 |
 | F06 Agent 活动 | 9 | A20、A44 | — |
 | F07 额度 | 10.1–10.3 | A21、A22、A25 | AX-06 |
 | F08 额度缓存 | 10.4 | A01、A17、A23、A24 | — |
-| F09 桌面面板 | 16 | A39–A42、A45 | AX-07 |
+| F09 桌面面板 | 16 | A39–A42、A45 | AX-07、AX-16 |
 | F10 紧凑状态 | 11 | A34、A35 | — |
 | F11 红狐休眠 | 12 | A36、A37 | — |
-| F12 声音 | 13 | A26–A33 | AX-08 |
+| F12 声音 | 13 | A26–A33 | AX-13；待决 AX-08 |
 | F13 设置与菜单栏 | 17 | A46–A48 | AX-01 |
 | F14 生命周期 | 18 | A38、A45、A33 | AX-02 |
-| F15 可用性诊断 | 14、19 | A49–A51、A53 | AX-09 |
+| F15 可用性诊断 | 14、19 | A49–A51、A53 | AX-17；待决 AX-09 |
 | F16 分发与维护 | 20 | A54 | AX-10 |
 
-### 21.2 建议补充的验收用例
+### 21.2 建议补充的回归用例（现有行为）
 
-PRD 第 18 节 A01–A54 未覆盖、但 SPEC 中有明确规则的行为：
+PRD 第 18 节 A01–A54 未覆盖、但 build 39 已经具备的行为。这些用例用来防止回归，通过条件就是当前行为。
 
 | 编号 | 优先级 | 前置条件与操作 | 通过条件 | SPEC |
 | --- | --- | --- | --- | --- |
 | AX-01 | P1 | 额度读取失败后点菜单栏 Refresh | 刷新完成前不显示“已刷新”；无补播声音；成功后 Saved 消失 | 17.1 |
-| AX-02 | P0 | 有 Processing 时系统睡眠，唤醒期间该任务已完成 | 唤醒后状态更新为真实值，不播放完成音 | 18 |
-| AX-03 | P0 | 身份已验证，清单确认为空 | 显示 `0 / 0 / 0` 而非 `—` | R-AGG-01 |
-| AX-04 | P0 | 任务 failed 进入 Waiting 后，用户在 Codex 中阅读该会话但不重试 | Waiting 保持（或按 Q-04 的决议） | R-CLASS-05 |
-| AX-05 | P1 | 同时出现超过 64 个侧聊候选 | 不崩溃；超出部分不计数；Info 体现部分覆盖 | R-SIDE-02 |
-| AX-06 | P1 | 来源同时给出权威标签与 10080 分钟周期 | 显示规则符合 Q-02 的决议；紧凑外圈仍按周额度绘制 | R-QUOTA-03 |
+| AX-02 | P0 | 有 Processing 时系统睡眠，睡眠期间该任务完成 | 唤醒后状态更新为真实值，不播放完成音 | 18 |
+| AX-03 | P0 | 身份已验证、连接有效、清单确认为空 | 显示 `0 / 0 / 0`；前提任一不满足时显示 `—` | R-AGG-01 |
+| AX-04 | P0 | 任务停止失败进入 Waiting，用户在 Codex 中阅读该会话但不重试；之后同一轮次恢复 active | 阅读后 Waiting 保持；恢复 active 后回到 Processing | R-CLASS-05 |
+| AX-06 | P1 | 额度响应：一个窗口 10080 分钟，一个窗口缺少时长 | 只显示 `Weekly remaining` 一行；缺时长窗口被跳过，不算格式异常；紧凑外圈按周额度绘制 | R-QUOTA-01、R-QUOTA-04 |
 | AX-07 | P2 | 悬浮提示靠近屏幕四边 | 约 350 毫秒后显示，完整可见 | 16.1 |
-| AX-08 | P1 | 连续 2 小时产生事件 | 已消费去重集合内存有界 | R-ALERT-03 |
-| AX-09 | P1 | 存在功能降级但覆盖率 100% | `Last complete sync` 不更新（或按 Q-01 的决议） | R-INFO-01 |
 | AX-10 | P2 | 启动 `--preview-sounds` 且已开启静音 | 三种声音依次播放，偏好文件不变，无监控连接 | R-REL-03 |
+| AX-11 | P0 | **反例**：只收到 `waitingOnApproval` 运行时标记，请求详情尚未到达，runtime 为 active | 判为 Waiting，不判为 Processing；播放一次等待音；请求详情随后到达时不再响 | R-CLASS-01、R-ALERT-02 |
+| AX-12 | P0 | **反例**：同一轮次仍有未回答异步问题时进入 completed / failed / interrupted | 不再因异步问题计为 Waiting，分别按 Done / 停止失败 / Stopped 分类 | R-ASK-01 |
+| AX-13 | P0 | **反例**：Processing 一次转为停止失败（runtime 由 active 变为 systemError，或 failed 且非 active） | 只播放一次失败音，不播放等待音 | R-ALERT-01a |
+| AX-14 | P0 | **反例**：会话 owner 已切换后，旧 owner 发来接收时间更晚的增量消息 | 该消息被拒绝，不覆盖新 owner 的状态，不产生提示音；新 owner 快照只建立静默基线 | R-SCOPE-05 |
+| AX-15 | P1 | 同时出现超过 64 个侧聊候选 | 不崩溃；超出的新候选被忽略、不计数；已接纳侧聊保持 | R-SIDE-02 |
+| AX-16 | P1 | 计数为 `—` 时点击计数区域 | 显示手形指针，点击打开 Codex | R-FOCUS-04 |
+| AX-17 | P1 | Usage 格式异常，其他来源正常 | 底部显示 `Connected · Limited`，不显示 `Incompatible Codex data` | 14.2 |
 
-## 22 待上游澄清问题
+### 21.3 待决改进的验收用例（当前未实现）
 
-以下问题按影响排序。每项给出 SPEC 当前采用的默认值；上游确认后应回写 PRD 或本 SPEC。
+以下用例对应〔待决〕规则。当前 build 39 **不满足**，不能作为现有行为的回归用例；只有上游决定采纳并实现后才转入正式验收。
 
-| 编号 | 问题 | PRD 位置 | SPEC 默认值 | 影响 |
+| 编号 | 优先级 | 前置条件与操作 | 采纳后的通过条件 | SPEC |
 | --- | --- | --- | --- | --- |
-| Q-01 | “完整同步时间”的建立条件：PRD 3 要求“无功能降级”，当前实现只检查 `covered == total && unassigned == 0`，且记录值取自额度读取时间，而不是本次快照时间 | 3、13.4 | 按实现 | Info 可能在功能降级时仍显示新的完整同步时间；额度缺失时完整同步时间永远不更新 |
-| Q-02 | 额度标签：实现会优先使用来源给出的权威标签，PRD 9.1 只写了按时长生成。若来源标签不是 `Weekly remaining`、但时长为 10080，该显示什么？`{n}-day/hour/minute remaining` 格式是否属于产品承诺？ | 9.1 | 按实现 | 文案一致性；A22 |
-| Q-03 | “Heartbeat 任务”未在第 3 节术语中定义。实现依据轮次的 `automationKind == "heartbeat"` 判定。是否还有其他自动化类型需要同样抑制声音？ | 10.1、11.3 | 只抑制 heartbeat | 声音范围 |
-| Q-04 | 停止失败（failed / systemError）进入 Waiting 后的退出条件 PRD 没写。实现中只有新轮次或离开范围才退出，Codex 已读不会清除。是否符合预期？用户读过失败结果后仍显示 `!` 是否可接受？ | 6.2、7 | 读后不清除 | Waiting 计数可能长期不归零 |
-| Q-05 | 范围为空时 PRD 写“可以显示三项 0”。实现为“必须”。建议改成“应”，避免实现之间不一致 | 3.2 | 必须显示 0 | A16 的反向用例 |
-| Q-06 | 底部连接标签的优先级（尤其 `Incompatible Codex data` 与 `Disconnected · Saved usage` 同时成立时）未定义 | 14.1 | 第 14.2 节表格 | 标签可预测性 |
-| Q-07 | 实现会为已接纳的临时侧聊也显示 `root` 行（`taskIDs = 主会话 ∪ 侧聊`），PRD 8.2 只说“主任务”。是否属于产品承诺？ | 8.2 | 按实现：侧聊也显示 | Agent 行数量；多个 `root` 行的辨识 |
-| Q-08 | 侧聊超过 64 个时的行为（拒绝新候选？淘汰旧的？Info 如何披露？）未定义 | 8.1 | 拒绝新候选 + Info 部分覆盖 | 极端场景的正确性 |
-| Q-09 | 声音去重集合（已消费的 occurrence）在同一身份下没有过期策略，长期运行会单调增长，与 19.1 “2 小时内存漂移 < 20 MiB”潜在冲突。是否允许按 TTL 或按会话移除时回收？ | 11.2、19.1 | 会话离开范围或轮次超过 1 个之后可回收 | 长期稳定性 |
-| Q-10 | 未发现 Codex 时只能重启 Status Board。是否应纳入 K-DISCOVERY-RETRY 周期性重新发现？（PRD 14.3 有“常规来源发现重试 约 15 秒”，与 5.1 表述存在张力） | 5.1、14.3 | 按 5.1：需要重启 | 首次安装体验 |
-| Q-11 | 16.3 “应用退出后清除此偏好域”容易被读成“应用退出时会自动清除”。建议改为“先退出应用，再由用户执行 `defaults delete local.statusboard.app`” | 16.3 | 用户手动 | 文档歧义 |
-| Q-12 | 计数为 `—` 时，任务计数区域是否仍可点击打开 Codex、是否显示手形指针？ | 5.2、12.5 | 可点击 | 交互一致性 |
-| Q-13 | 第 6.1 节第 5 行：`runtime` 非 active（如 idle / notLoaded）但 `turnStatus == inProgress` 时判定为 Processing。这是否与 6.1 末段“历史 inProgress 不足以恢复 Processing”矛盾？需明确“当前有效状态来源”指什么 | 6.1 | 仅当前连接代次的实时观察可产生 Processing（R-CLASS-04） | 误报 Processing |
-| Q-14 | 编号命名不一致：2.1 中 F13 为“设置与菜单栏”、F15 为“可用性诊断”；第 20 节索引分别写成“设置与 Info”“数据与诊断” | 2.1、20 | 以 2.1 为准 | 追溯 |
-| Q-15 | 验收清单缺少以下行为的用例：菜单栏 Refresh、系统睡眠/唤醒中途发生的状态转移、`--preview-sounds`、悬浮提示定位、空范围显示 0。建议吸收第 21.2 节 AX-01–AX-10 | 18 | — | 验收完整性 |
+| AX-05 | P1 | 同时出现超过 64 个侧聊候选 | Info 披露因超限造成的部分覆盖；低于上限后披露解除 | R-SIDE-02a |
+| AX-08 | P1 | 同一身份下连续 2 小时产生事件，并穿插重放、重连、旧 owner 迟到消息 | 已消费集合内存有界，且没有任何重复响铃 | R-ALERT-03a |
+| AX-09 | P1 | 额度刷新周期（约 60 秒）中途，任务范围首次达到完整且无降级 | 完整同步时间记录为实际达到完整的时刻，而不是最近一次额度读取时间；它的保存不依赖额度缓存写入 | R-INFO-01a |
+
+## 22 澄清问题与改进事项
+
+### 22.1 0.1 版问题的处理结果
+
+下表沿用 0.1 版 Q 编号；“issue 编号”是 #2 正文中的编号，两者不同。结论依据上游在 #2 的审查意见和 build 39 源码（`3a3950f`）。
+
+| 编号 | issue 编号 | 问题 | 结论 | SPEC 落点 | 建议回写 PRD |
+| --- | --- | --- | --- | --- | --- |
+| Q-01 | 1 | 完整同步时间的建立条件 | 0.1 版推断有误：外层快照在任一功能降级时会清空本次值，与 PRD 一致。剩余问题是时间值取自额度读取时间、保存依附额度缓存 → 列为改进事项 I-01 | R-INFO-01〔现有〕、R-INFO-01a〔待决〕 | 第 3 节补充“Info 显示最近一次成功值” |
+| Q-02 | 2 | 额度标签来源 | 0.1 版表述有误：解码器不读取来源标签，标签只由时长生成。文案格式是否承诺另行决定；支持来源标签前须先有独立周期语义 | R-QUOTA-03〔现有〕、R-QUOTA-04 | 9.1 补充“周期未知的窗口跳过” |
+| Q-03 | 7 | Heartbeat 定义 | 补术语；只抑制 heartbeat 的声音，不扩大范围 | 第 2 节术语〔确认〕 | 第 3 节术语表加 Heartbeat |
+| Q-04 | 5 | 停止失败 Waiting 的退出 | 0.1 版过于绝对：分类每次重新求值，同轮次恢复 active 也会离开。已读本身不解除失败。“用户确认失败”机制属新增决策 | R-CLASS-05〔确认〕〔待决〕 | 6.2 补“已读不解除失败 Waiting” |
+| Q-05 | 12 | 空范围显示 0 | 同意改为“应”，并保留身份、范围、连接、数据有效等前提 | R-AGG-01〔确认〕 | 3.2 “可以”改“应”，并列出前提 |
+| Q-06 | 6 | 连接标签优先级 | 写入；区分全局兼容性问题与单功能不兼容 | 14.2〔确认〕 | 14.1 加优先级表 |
+| Q-07 | 3 | 侧聊的 Agent 行 | 确认：顶层任务包括已验证侧聊 | R-AGENT-01〔确认〕 | 8.2 “主任务”改为“已纳入统计的顶层任务（含已验证侧聊）” |
+| Q-08 | 8 | 侧聊超过 64 个 | 现状只拒绝新候选，不淘汰、不披露。披露属改进事项 I-02 | R-SIDE-02〔现有〕、R-SIDE-02a〔待决〕 | 8.1 补“达到上限后拒绝新候选” |
+| Q-09 | 9 | 去重集合不回收 | 风险成立，但尚无测量证明超标。先设计重放边界再回收 → 改进事项 I-03 | R-ALERT-03〔现有〕、R-ALERT-03a〔待决〕 | 暂不回写 |
+| Q-10 | 11 | 未发现 Codex 与 15 秒重试 | 不矛盾：两种不同的发现过程。参数已改名区分。运行中重新发现应用 → 改进事项 I-04 | 第 15 节、第 18 节 | 14.3 将该行改名为“会话来源 / owner 发现重试” |
+| Q-11 | 13 | 偏好清理措辞 | 同意改为用户手动操作 | 19.1〔确认〕 | 16.3 改为“先退出应用，再执行 `defaults delete local.statusboard.app`” |
+| Q-12 | 10 | `—` 时的点击与指针 | 保留现状并写明 | R-FOCUS-04〔确认〕 | 12.5 补充 |
+| Q-13 | 4 | 实时与历史 inProgress | 不矛盾，补充来源有效性定义；`notLoaded` 不是有效 runtime | R-CLASS-04〔确认〕〔现有〕 | 6.1 末段补“当前有效状态来源”的定义 |
+| Q-14 | 14 | F13 / F15 名称 | 以 2.1 功能表为准统一 | 第 21.1 节已按 2.1 命名 | 第 20 节索引改名 |
+| Q-15 | 15 | 验收清单缺口 | 同意补齐；现有行为用例与待决用例分开 | 21.2、21.3 | 第 18 节吸收 21.2 |
+
+### 22.2 0.2 版修正的 SPEC 规则缺陷
+
+上游审查与补查发现，0.1 版有以下规则会导致等价重写出错，已在 0.2 版修正：
+
+| 来源 | 0.1 版缺陷 | 修正 | 反例用例 |
+| --- | --- | --- | --- |
+| #2 审查 1 | 分类漏掉运行时等待标记 `waitingOnApproval` / `waitingOnUserInput`，标记先到时会把 Waiting 错判为 Processing | 第 2 节新增 `activeFlags` 与 `isWaitingForUser`；5.1 第 1 步改用它 | AX-11 |
+| #2 审查 2 | 只规定换轮次时清空异步问题，同一轮次结束后旧问题仍会压过终态 | R-ASK-01 / R-ASK-02 限定当前执行轮次，区分“问题失效”和“接受回答” | AX-12 |
+| #2 审查 3 | 等待音包含 waitingError，与失败音重叠；完成音缺少“此前为 inProgress 或 active”和“前后覆盖最新轮次”前提 | 13.1 改为三个独立判定加公共前提 | AX-13 |
+| #2 审查 4 | 多窗口按 `(connectionGeneration, observedAt)` 取最新，旧 owner 的迟到消息可能胜出 | R-SCOPE-05 改为 owner + 版本连续性仲裁，owner 改变时重建静默基线 | AX-14 |
+| 补查 | R-QUOTA-01 把缺少时长的窗口视为格式异常 | 改为跳过该窗口 | AX-06 |
+| 补查 | R-ALERT-02 的 `waitEpisode` 计数器不是现有实现 | 改为实际去重键 | AX-11 |
+
+### 22.3 改进事项（实现修复或新增，非文档问题）
+
+以下事项需要改代码，不属于文档澄清。本 SPEC 不为它们设定负责人或排期。
+
+| 编号 | 事项 | 规则 | 验收 |
+| --- | --- | --- | --- |
+| I-01 | 完整同步时间与额度读取解耦 | R-INFO-01a | AX-09 |
+| I-02 | 侧聊超限时在 Info 披露部分覆盖（需先定义超限状态及解除条件） | R-SIDE-02a | AX-05 |
+| I-03 | 声音去重集合有界回收（需先设计重放边界） | R-ALERT-03a | AX-08 |
+| I-04 | 运行中自动重新发现 Codex 应用安装位置 | 第 18 节 | — |
+| I-05 | 是否增加“用户确认失败后清除 Waiting”机制（产品决策） | R-CLASS-05 | — |
+| I-06 | 是否把生成的额度文案格式作为产品承诺；是否支持来源标签 | R-QUOTA-03、R-QUOTA-04 | — |
+
+### 22.4 尚未关闭的问题
+
+当前没有新的待澄清问题。I-05、I-06 需要上游做产品决策。
