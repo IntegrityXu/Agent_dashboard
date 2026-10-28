@@ -277,8 +277,9 @@ struct BoardView: View {
                                     Spacer(minLength: 0)
                                 }
                                 .font(.system(size: 12)).foregroundStyle(mutedText)
+                                .padding(.leading, agent.isRoot ? 0 : 10)
                                 .frame(height: 20)
-                                .quickHelp(agent.path + agent.state.suffix)
+                                .quickHelp(agent.help)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(agent.name)
                                 .accessibilityValue(agent.state == .running ? "Running" : agent.state.rawValue)

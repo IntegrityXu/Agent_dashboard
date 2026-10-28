@@ -33,6 +33,7 @@ final class DesktopSession {
     var client = "initializing-client"
     var ids = Set<String>()
     var inventoryActivity: [String: Inventory.Activity]?
+    var titles: [String: String] = [:]
     var lastCodexActivityAt: Date?
     // Descendants are observed for the inline list only, never task counts or audio.
     var agentIDs = Set<String>()
@@ -318,7 +319,7 @@ final class DesktopSession {
         result.audioEvents = audioEvents
         result.invalidatedAudioThreads = invalidatedAudioThreads
         result.compactStatus = compactStatus.status(observations: observations.filter { taskIDs.contains($0.key) }, counts: result.counts)
-        if result.isConnected { result.agents = ProcessingAgents.rows(roots: taskIDs, observations: observations, stored: storedAgentObservations) }
+        if result.isConnected { result.agents = ProcessingAgents.rows(roots: taskIDs, observations: observations, stored: storedAgentObservations, titles: titles) }
         // A transient inventory failure preserves recent, verified scope.
         // Longer failures stop presenting stale counts as current data.
         if !inventoryAvailable && ids.isEmpty || sourceFailures.expired(.inventory, now: now) || sourceFailures.failures[.inventory]?.incompatible == true {

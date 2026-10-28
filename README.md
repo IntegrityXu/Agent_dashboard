@@ -2,7 +2,7 @@
 
 为 Codex 桌面端设计的原生 macOS 状态面板。在桌面上查看正在处理、等待操作和已完成未读的任务，以及账户可用额度；任务需要关注时，通过短提示音提醒你。
 
-基于 **SwiftUI + AppKit**，支持可拖动的红狐头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.2 · build 39**，处于个人预览阶段。
+基于 **SwiftUI + AppKit**，支持可拖动的红狐头像、展开面板、置顶和菜单栏入口。当前版本为 **0.2.3 · build 40**，处于个人预览阶段。
 
 > 状态来自当前账户可验证的本地会话。面板显示已同步范围内的数据，不代表整个账户的全部任务；可在 **Info** 中查看同步覆盖率和各项功能的可用性。
 
@@ -25,13 +25,13 @@ Status Board 是独立维护的第三方预览工具，不是 OpenAI 或 Apple �
 
 ## 下载与安装
 
-**[下载 0.2.2 build 39 预览版（macOS 通用 ZIP）](https://github.com/IntegrityXu/Agent_dashboard/releases/download/v0.2.2-preview.39/StatusBoard-0.2.2-build39-macOS-universal.zip)** · [发布说明与所有版本](https://github.com/IntegrityXu/Agent_dashboard/releases)
+**[下载 0.2.3 build 40 预览版（macOS 通用 ZIP）](https://github.com/IntegrityXu/T-Board/releases/download/v0.2.3-preview.40/StatusBoard-0.2.3-build40-macOS-universal.zip)** · [发布说明与所有版本](https://github.com/IntegrityXu/T-Board/releases)
 
 下载前请阅读上述声明及预览版限制。自 build 39 起，应用包的 `Contents/Resources/Legal/` 随附 MIT 许可证、免责声明、隐私说明、第三方资源声明和安全报告说明；可在 Finder 中右键应用，选择“显示包内容”查看。
 
 下载使用无需 Xcode、Swift 或 Python。需要 **macOS 15.0 及以上**，并已安装、登录且运行 Codex macOS 桌面端。应用包包含 **Intel（x86_64）与 Apple Silicon（arm64）** 两种架构；现有实际运行验证来自 Intel Mac，完整 Apple Silicon 运行验收仍待完成。
 
-1. 下载 `StatusBoard-0.2.2-build39-macOS-universal.zip` 并解压。Releases 中自动生成的 `Source code (zip)` / `Source code (tar.gz)` 是源码，不是可直接运行的应用。
+1. 下载 `StatusBoard-0.2.3-build40-macOS-universal.zip` 并解压。Releases 中自动生成的 `Source code (zip)` / `Source code (tar.gz)` 是源码，不是可直接运行的应用。
 2. 将 `Status Board.app` 拖入“应用程序”（Applications）文件夹，再双击打开。
 3. 首次启动会显示红狐头像；点击头像展开面板。应用以菜单栏程序运行，不显示普通 Dock 图标；找不到面板时，从菜单栏选择 **Show Status Board**。
 
@@ -58,7 +58,7 @@ shasum -a 256 -c SHA256SUMS.txt
 
 - **任务状态**：查看 Processing、Waiting for operation 和 Done，支持已验证的本地临时侧聊。
 - **未读完成恢复**：启动或重连后恢复可验证的已完成未读任务，在 Codex 中阅读后自动更新。
-- **Agent 活动**：任务处理期间显示主 Agent 和子 Agent 的活动行；子 Agent 不重复计入顶层任务数量。
+- **Agent 活动**：任务处理期间显示聊天标题与缩进的子 Agent 活动行；长标题可悬停查看，子 Agent 不重复计入顶层任务数量。
 - **账户额度**：展示 Codex 提供的额度周期；连接异常时可保留同一账户的已验证缓存，并标记为 Saved。
 - **桌面交互**：头像与面板切换、拖动、置顶、详情折叠，自动保存位置和显示偏好。
 - **声音提醒**：完成、等待操作、停止错误使用不同短音效，支持一键静音。
@@ -81,7 +81,7 @@ Swift Package 使用本地模块，没有远程包依赖。项目内置固定版
 ### 构建与启动
 
 ```sh
-git clone https://github.com/IntegrityXu/Agent_dashboard.git
+git clone https://github.com/IntegrityXu/T-Board.git
 cd Agent_dashboard
 
 # 编译 Release、打包并进行本地 ad-hoc 签名
@@ -143,7 +143,7 @@ Dashboard 悬浮头像使用非睡眠版 `StatusBoard/Resources/fox-red.svg`，�
 
 ### 声音提醒
 
-完成为上行双音，等待为重复双音，停止错误为下行双音。声音按顺序播放并去重；启动、重连、历史恢复、已读变化和额度变化不会补播历史提醒。静音期间的事件不会在取消静音后重放。Heartbeat 自动化的声音提醒目前保持关闭。
+完成为 0.65 秒木敲双音，等待为重复双音，停止错误为下行双音。声音按顺序播放并去重；启动、重连、历史恢复、已读变化和额度变化不会补播历史提醒。静音期间的事件不会在取消静音后重放。Heartbeat 自动化的声音提醒目前保持关闭。
 
 **尚未接入 macOS Focus 自动静音**。需要安静时，请使用 **Mute Sounds**；正常音量跟随系统输出音量。
 
@@ -181,7 +181,7 @@ bash scripts/package-release.sh
 
 也可在 Xcode 中打开 `StatusBoard.xcodeproj`，选择共享的 **StatusBoard** scheme。构建缓存输出到 `.build/`，本地应用包输出到 `dist/`，验证产物输出到 `artifacts/`；这些目录均不提交。
 
-build 39 已通过 **163 项 Swift 测试、185 项原生断言、通用 Release 构建、ZIP 完整性及解压后签名检查**，详见[红狐预览版发布验证](docs/verification/fox-preview-build-39.md)。这不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
+build 40 已通过 **165 项 Swift 测试、185 项原生断言、通用 Release 构建、ZIP 完整性及解压后签名检查**，详见[聊天标题与提示音发布验证](docs/verification/title-sound-build-40.md)。这不代表所有设备、Codex 更新和实际交互场景都已验收。完整进度与已知缺口见[实现与验证索引](docs/verification/results.md)。
 
 ### 目录结构
 

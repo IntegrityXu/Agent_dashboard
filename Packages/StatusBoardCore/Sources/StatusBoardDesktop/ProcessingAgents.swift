@@ -5,11 +5,21 @@ public struct ProcessingAgent: Identifiable, Equatable, Sendable {
     public let threadID: String
     public let path: String
     public let state: AgentActivity.State
+    public let title: String?
     public var id: String { rootID + ":" + threadID }
-    public var name: String { path.split(separator: "/").last.map(String.init) ?? "agent" }
+    public var isRoot: Bool { path == "/root" }
+    public var name: String {
+        if isRoot { return title ?? "Chat · " + String(threadID.suffix(6)) }
+        return path.split(separator: "/").last.map(String.init) ?? "agent"
+    }
+    public var help: String {
+        isRoot ? label : (title.map { $0 + "\n" } ?? "") + path + state.suffix
+    }
     public var label: String { name + state.suffix }
-    public init(rootID: String, threadID: String, path: String, state: AgentActivity.State) {
+    public init(rootID: String, threadID: String, path: String, state: AgentActivity.State, title: String? = nil) {
         self.rootID = rootID; self.threadID = threadID; self.path = path; self.state = state
+        let cleaned = title?.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        self.title = cleaned.flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -17,12 +27,12 @@ enum ProcessingAgents {
     /// Each list belongs to a currently processing root. Terminal turns, lost
     /// coverage, and the next turn cannot retain an earlier run's agents.
     static func rows(roots: Set<String>, observations: [String: DesktopObservation],
-                     stored: [String: [String: DesktopObservation]] = [:]) -> [ProcessingAgent] {
+                     stored: [String: [String: DesktopObservation]] = [:], titles: [String: String] = [:]) -> [ProcessingAgent] {
         var rows: [ProcessingAgent] = []
         for root in roots.sorted() {
             guard let observation = observations[root], LiveClassification.state(observation) == .processing,
                   !["completed", "failed", "interrupted"].contains(observation.status ?? "") else { continue }
-            rows.append(ProcessingAgent(rootID: root, threadID: root, path: "/root", state: .running))
+            rows.append(ProcessingAgent(rootID: root, threadID: root, path: "/root", state: .running, title: titles[root]))
             var visited: Set<String> = [root]
             func appendChildren(_ parent: DesktopObservation, path: String) {
                 for agent in parent.agents where agent.path.hasPrefix(path + "/") {
@@ -30,7 +40,7 @@ enum ProcessingAgents {
                     let recorded = observation.runID.flatMap { stored[$0]?[agent.threadID] }
                     let child = childObservation(live: observations[agent.threadID], recorded: recorded)
                     rows.append(ProcessingAgent(rootID: root, threadID: agent.threadID, path: agent.path,
-                        state: child.map { childState($0, fallback: agent.state) } ?? agent.state))
+                        state: child.map { childState($0, fallback: agent.state) } ?? agent.state, title: titles[root]))
                     if let child { appendChildren(child, path: agent.path) }
                 }
             }

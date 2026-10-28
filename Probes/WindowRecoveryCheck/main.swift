@@ -519,12 +519,12 @@ final class RecoveryCheckDelegate: NSObject, NSApplicationDelegate {
         var snapshot = LiveSnapshot()
         snapshot.isConnected = true; snapshot.accountFingerprint = "agent-layout-fixture"
         snapshot.counts = TaskCounts(processing: 1)
-        snapshot.agents = [ProcessingAgent(rootID: "R", threadID: "R", path: "/root", state: .running),
+        snapshot.agents = [ProcessingAgent(rootID: "R", threadID: "R", path: "/root", state: .running, title: "改进任务名称显示"),
             ProcessingAgent(rootID: "R", threadID: "A", path: "/root/reviewer", state: .running),
             ProcessingAgent(rootID: "R", threadID: "B", path: "/root/tester", state: .done)]
         let originalHeight = board.model.cardHeight
         board.receive(snapshot)
-        check(board.model.agents.map(\.label) == ["root.....", "reviewer.....", "tester done"], "agent rows use name plus running dots or done")
+        check(board.model.agents.map(\.label) == ["改进任务名称显示.....", "reviewer.....", "tester done"], "agent rows use name plus running dots or done")
         check(board.model.cardHeight == originalHeight + 81, "agent divider and three rows increase card height")
         check(board.panel.frame.size == board.model.panelSize, "native window grows with agent rows")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

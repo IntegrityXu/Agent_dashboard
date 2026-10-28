@@ -55,7 +55,7 @@ private func agentStream(id: String = "root", status: String = "inProgress", ite
         nestedID: try #require(agentStream(id: nestedID, status: "completed").observation),
         "other": try #require(agentStream(id: "other").observation)]
     let rows = ProcessingAgents.rows(roots: ["root", "other"], observations: observations)
-    #expect(rows.map(\.label) == ["root.....", "root.....", "reviewer.....", "tester done"])
+    #expect(rows.map(\.label) == ["Chat · other.....", "Chat · root.....", "reviewer.....", "tester done"])
     #expect(Set(rows.map(\.id)).count == rows.count)
     observations["root"]?.status = "completed" // Clear even before the runtime idle patch.
     #expect(ProcessingAgents.rows(roots: ["root", "other"], observations: observations).map(\.threadID) == ["other"])
@@ -68,7 +68,7 @@ private func agentStream(id: String = "root", status: String = "inProgress", ite
     let next = try agentWire(["type": "patches", "baseRevision": 1, "revision": 2,
         "patches": [["op": "add", "path": ["turns", 1], "value": ["turnId": "new-run", "status": "inProgress", "items": []]]]])
     _ = try stream.accept(change: next, owner: "owner")
-    #expect(ProcessingAgents.rows(roots: ["root"], observations: ["root": try #require(stream.observation)]).map(\.label) == ["root....."])
+    #expect(ProcessingAgents.rows(roots: ["root"], observations: ["root": try #require(stream.observation)]).map(\.label) == ["Chat · root....."])
     stream.invalidate()
     #expect(ProcessingAgents.rows(roots: ["root"], observations: [:]).isEmpty)
 }
@@ -115,4 +115,20 @@ private func agentStream(id: String = "root", status: String = "inProgress", ite
     #expect(try reader.read(roots: ["root": root]).isEmpty)
     root.status = "completed"
     #expect(try reader.read(roots: ["root": root]).isEmpty)
+}
+
+@Test func processingTitlesKeepChatsDistinctAndChildrenAssociated() throws {
+    let observation = try #require(agentStream(items: [activity("started")]).observation)
+    let rows = ProcessingAgents.rows(roots: ["root", "other"], observations: ["root": observation, "other": observation],
+        titles: ["root": "  修复面板\n显示问题  ", "other": "Review / status labels"])
+    #expect(rows.first?.name == "Review / status labels")
+    let root = try #require(rows.first { $0.threadID == "root" })
+    #expect(root.name == "修复面板 显示问题")
+    #expect(root.path == "/root")
+    #expect(root.help == "修复面板 显示问题.....")
+    let child = try #require(rows.first { $0.rootID == "root" && $0.threadID == childID })
+    #expect(child.name == "reviewer")
+    #expect(child.help == "修复面板 显示问题\n/root/reviewer.....")
+    let unnamed = ProcessingAgent(rootID: "root", threadID: "root", path: "/root", state: .running, title: " \n ")
+    #expect(unnamed.name == "Chat · root")
 }

@@ -96,4 +96,17 @@ private func observed(runtime: String = "idle", status: String = "completed", un
     #expect(result.ids == [ids[0]])
     #expect(result.total == 1)
     #expect(result.unassigned == 1)
+    #expect(result.titles.isEmpty) // Older schemas still provide counts.
+    #expect(sqlite3_exec(db, "ALTER TABLE threads ADD COLUMN title TEXT; UPDATE threads SET title='PRIVATE_FIRST_USER_PROMPT';", nil, nil, nil) == SQLITE_OK)
+    // A legacy title is not a sidebar name and must never be shown.
+    #expect(try LocalInventory(path: path).read(account: "A").titles.isEmpty)
+    #expect(sqlite3_exec(db, "ALTER TABLE threads ADD COLUMN name TEXT; UPDATE threads SET name='Private other name';", nil, nil, nil) == SQLITE_OK)
+    #expect(sqlite3_exec(db, "UPDATE threads SET name='Fix panel labels' WHERE id='\(ids[0])';", nil, nil, nil) == SQLITE_OK)
+    let titled = try LocalInventory(path: path).read(account: "A")
+    #expect(titled.ids == result.ids)
+    #expect(titled.titles == [ids[0]: "Fix panel labels"])
+    #expect(sqlite3_exec(db, "UPDATE threads SET name='Renamed chat' WHERE id='\(ids[0])';", nil, nil, nil) == SQLITE_OK)
+    #expect(try LocalInventory(path: path).read(account: "A").titles == [ids[0]: "Renamed chat"])
+    #expect(sqlite3_exec(db, "UPDATE threads SET name=NULL WHERE id='\(ids[0])';", nil, nil, nil) == SQLITE_OK)
+    #expect(try LocalInventory(path: path).read(account: "A").titles.isEmpty)
 }

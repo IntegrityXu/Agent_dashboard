@@ -1,6 +1,8 @@
 # Implementation and verification results
 
-Reviewed October 26, 2026 (America/New_York), against the current source and existing verification records. Current application: **0.2.2 build 39**, using per-feature contract checks instead of a build allowlist. The original private contracts were inspected on Codex builds 21477 and 21828; future semantic compatibility is not guaranteed.
+Reviewed October 27, 2026 (America/New_York), against the current source and existing verification records. Current application: **0.2.3 build 40**, using per-feature contract checks instead of a build allowlist. The original private contracts were inspected on Codex builds 21477 and 21828; future semantic compatibility is not guaranteed.
+
+Build 40 title/sound preview: chat display names replace repeated root labels, child-agent rows are indented, and the completion sound is a 650 ms wooden double tap. **165 Swift tests, 185 native assertions, universal Release packaging, archive/resource and extracted-signature checks passed.** See [build 40 release verification](title-sound-build-40.md).
 
 Build 39 red-fox preview: new awake/sleeping avatar, application and menu bar artwork, a 30-minute conversation-idle timer, bundled legal notices, and repeatable ZIP/checksum packaging. **163 Swift tests, 185 native assertions, universal Release build, archive/resource checks and extracted-app signature verification pass.** See [build 39 release verification](fox-preview-build-39.md).
 

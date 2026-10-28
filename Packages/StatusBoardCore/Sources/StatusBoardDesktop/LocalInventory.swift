@@ -9,6 +9,7 @@ struct Inventory {
     let activity: [String: Activity]
     let total: Int
     let unassigned: Int
+    var titles: [String: String] = [:]
 }
 
 struct LocalInventory {
@@ -17,7 +18,8 @@ struct LocalInventory {
         let connection = try ReadOnlyStore(path: path, busyTimeout: 200)
         defer { connection.close() }
         let db = connection.db
-        // No prompts, names, rollout paths, or task bodies are selected.
+        // Codex displays `name`; legacy `title` can contain the entire first prompt.
+        // Never use `title` or message content as a display-name fallback.
         let sql = """
         SELECT t.id, t.creator_account_id, t.source, t.recency_at_ms, t.updated_at FROM threads t
         WHERE t.archived=0 AND NOT EXISTS
@@ -25,10 +27,17 @@ struct LocalInventory {
         ORDER BY t.recency_at_ms DESC, t.updated_at DESC
         """
         var statement: OpaquePointer?
-        guard sb_sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { throw StoreFailure(db, path: path) }
+        let titledSQL = sql.replacingOccurrences(of: "t.updated_at FROM", with: "t.updated_at, t.name FROM")
+        let hasTitles = sb_sqlite3_prepare_v2(db, titledSQL, -1, &statement, nil) == SQLITE_OK
+        if !hasTitles {
+            // Optional display metadata must not break counts on older schemas.
+            sb_sqlite3_finalize(statement); statement = nil
+            guard sb_sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { throw StoreFailure(db, path: path) }
+        }
         defer { sb_sqlite3_finalize(statement) }
         var ids: [String] = [], unassigned = 0
         var activity: [String: Inventory.Activity] = [:]
+        var titles: [String: String] = [:]
         while true {
             let result = sb_sqlite3_step(statement)
             if result == SQLITE_DONE { break }
@@ -47,8 +56,9 @@ struct LocalInventory {
             if creator == account {
                 ids.append(id)
                 activity[id] = .init(recency: sb_sqlite3_column_int64(statement, 3), updated: sb_sqlite3_column_int64(statement, 4))
+                if hasTitles, sb_sqlite3_column_type(statement, 5) == SQLITE_TEXT { titles[id] = value(5) }
             }
         }
-        return Inventory(ids: ids, activity: activity, total: ids.count, unassigned: unassigned)
+        return Inventory(ids: ids, activity: activity, total: ids.count, unassigned: unassigned, titles: titles)
     }
 }

@@ -534,12 +534,12 @@ private func followingHint(_ id: String, host: String = "local", version: Int = 
                 "turns": [["turnId": "child-run", "status": "inProgress"]]]]]]))
     #expect(f.snapshot.counts?.processing == 1)
     #expect(f.snapshot.covered == 1 && f.snapshot.total == 1)
-    #expect(f.snapshot.agents.map(\.label) == ["root.....", "reviewer....."])
+    #expect(f.snapshot.agents.map(\.label) == ["Chat · \(f.id.suffix(6)).....", "reviewer....."])
     try f.session.handle(sessionWire(["type": "broadcast", "method": "thread-stream-state-changed", "version": 11,
         "sourceClientId": "child-owner", "params": ["hostId": "local", "conversationId": child,
             "change": ["type": "patches", "baseRevision": 1, "revision": 2, "patches": [
                 ["op": "replace", "path": ["turns", 0, "status"], "value": "completed"]]]]]))
-    #expect(f.snapshot.agents.map(\.label) == ["root.....", "reviewer done"])
+    #expect(f.snapshot.agents.map(\.label) == ["Chat · \(f.id.suffix(6)).....", "reviewer done"])
     #expect(f.snapshot.counts?.done == 0)
     #expect(f.publications.snapshots.flatMap(\.audioEvents).isEmpty)
     try f.patch(9, [["op": "replace", "path": ["turns", 0, "status"], "value": "completed"]])
@@ -900,4 +900,16 @@ private final class StartupQuotaRPC: DesktopRPC {
         #expect(f.snapshot.audioEvents.isEmpty)
     }
     #expect(f.transport.sent.isEmpty) // Recovery did not need a live conversation or new prompt.
+}
+
+@Test func sessionPublishesRefreshedTitlesAndDropsRemovedChatMetadata() throws {
+    let f = try SessionFixture()
+    try f.owner(); try f.snapshot(false, runtime: "active", status: "inProgress")
+    try f.session.applyInventory(.init(ids: [f.id], activity: [:], total: 1, unassigned: 0, titles: [f.id: "Panel labels"]))
+    #expect(f.snapshot.agents.first?.name == "Panel labels")
+    try f.session.applyInventory(.init(ids: [f.id], activity: [:], total: 1, unassigned: 0, titles: [f.id: "Renamed chat"]))
+    #expect(f.snapshot.agents.first?.name == "Renamed chat")
+    try f.session.applyInventory(.init(ids: [], activity: [:], total: 0, unassigned: 0))
+    #expect(f.session.titles.isEmpty)
+    #expect(f.snapshot.agents.isEmpty)
 }

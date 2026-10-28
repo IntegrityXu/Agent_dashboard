@@ -45,10 +45,12 @@ extension BoardDelegate {
                 }
                 if name.hasPrefix("agents") {
                     snapshot.agents = [
-                        ProcessingAgent(rootID: "fixture", threadID: "root", path: "/root", state: .running),
+                        ProcessingAgent(rootID: "fixture", threadID: "fixture", path: "/root", state: .running, title: "改进任务名称显示"),
                         ProcessingAgent(rootID: "fixture", threadID: "review", path: "/root/reviewer", state: .running),
                         ProcessingAgent(rootID: "fixture", threadID: "test", path: "/root/tester", state: .done)]
                     if name == "agents-overflow" {
+                        snapshot.agents.append(ProcessingAgent(rootID: "second", threadID: "second", path: "/root", state: .running,
+                            title: "Review the status panel layout and verify long conversation titles"))
                         snapshot.agents += (0..<6).map { ProcessingAgent(rootID: "fixture", threadID: "extra-\($0)",
                             path: "/root/very_long_agent_name_for_layout_verification_\($0)", state: .running) }
                     }

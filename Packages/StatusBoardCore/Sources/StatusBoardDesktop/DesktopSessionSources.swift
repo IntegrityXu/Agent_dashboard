@@ -22,6 +22,7 @@ extension DesktopSession {
             })
         }
         inventoryActivity = result.activity
+        titles = result.titles.filter { next.contains($0.key) }
         ids = next; total = result.total; unassigned = result.unassigned
         try refreshSideChats()
     }
